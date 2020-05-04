@@ -2,3 +2,7 @@ data/*
 outputs/*
 Debug/*
 Release/*
+
+*.d
+*.o
+decipher
