@@ -39,9 +39,11 @@ public:
 
 	/*
 	 * This implementation makes the following assumptions about indexing:
-	 *    * symbols indexed 1 through 29 are punctuation marks that can only be inserted, deleted or substituted with their equivalent
+	 *    * symbols indexed 1 through 29 are punctuation marks that can only be
+	 *          inserted, deleted or substituted with their equivalent
 	 *    * symbols indexed 30 through alphabetSize are the remaining characters
-	 *    * symbol indexed alphabetSize + 1 corresponds to an epsilon-transition (insertion for Latin, deletion for original)
+	 *    * symbol indexed alphabetSize + 1 corresponds to an epsilon-transition
+	 *          (insertion for Latin, deletion for original)
 	 *
 	 * Index 0 is reserved in OpenFST for epsilon and is not used in this implementation.
 	 * We replace it with separate insertion and deletion symbols described above to avoid composition issues
