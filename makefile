@@ -5,14 +5,14 @@ main.o : main.cpp
 	@echo 'Finished building: main.cpp'
 	@echo ' '
 
-#All Target
-all: decipher
+all : decipher
 
-
-# Tool invocations
-decipher: main.o
+decipher : main.o
 	@echo 'Building target: main.o'
 	@echo 'Invoking linker'
 	g++ -L/usr/local/lib/ -o "decipher" "main.o" -lfst -lngram
 	@echo 'Finished building target'
 	@echo ' '
+
+clean :
+	rm "main.d" "main.o"
