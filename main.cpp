@@ -52,7 +52,8 @@ void PrintHelp() {
 		"--upgrade-lm-every [E]:               Increasing language model order after processing every E batches (unsupervised training only)\n"
 		"--upgrade-lm-by [U]:                  Increasing language model order by U each time (unsupervised training only)\n"
 		"--prior [phonetic|visual|combined]:   Prior on emission parameters (unsupervised training only; default = uniform)\n"
-		"--freeze-at [F]:                      Train with freezing insertion and deletion probabilities at F for the first E batches (unsupervised training only)\n"
+		"--freeze-at [F]:                      Train with freezing insertion and deletion probabilities at F for the first E batches "
+		                                       "(unsupervised training only)\n"
 		"--supervised:                         Train a supervised model on validation data\n"
 		"--no-epsilons:                        Turn off insertions and deletions (unsupervised training only)\n"
 		"--no-test:                            Turn off testing\n"
@@ -167,7 +168,8 @@ void ProcessArgs(int argc, char* argv[]) {
     	std::cout << "Language model order will be increased by " << upgrade_lm_by << " each time\n";
     	if (freeze_at > 0) {
         	std::cout << "Insertion and deletion probabilities frozen at " << exp(-freeze_at) <<
-        			" (" <<  freeze_at << " in negative log space) for the first "<< upgrade_lm_every << " batches\n";
+        			" (" <<  freeze_at << " in negative log space) for the first " <<
+					upgrade_lm_every << " batches\n";
     	}
     }
     std::cout << "Seed: " << seed << std::endl;

@@ -132,7 +132,8 @@ public:
 
 			if (verbose) {
 				elapsed = (std::clock() - start) / (double) CLOCKS_PER_SEC;
-				std::cout << "Time elapsed: "<< elapsed << "; tokens per second: "<< numTokens / elapsed << std::endl;
+				std::cout << "Time elapsed: "<< elapsed << "; tokens per second: " <<
+						numTokens / elapsed << std::endl;
 			}
 
 			// Normalizing expected counts collected over entire corpus
