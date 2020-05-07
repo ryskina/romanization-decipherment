@@ -1,4 +1,4 @@
-This repository contains the code for the paper:
+This repository contains the code for the [paper](https://arxiv.org/pdf/2005.02517.pdf):
 
 ```
 Phonetic and Visual Priors for Decipherment of Informal Romanization
