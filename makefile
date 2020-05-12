@@ -1,3 +1,10 @@
+decipher : main.o
+	@echo 'Building target: main.o'
+	@echo 'Invoking linker'
+	g++ -L/usr/local/lib/ -o "decipher" "main.o" -lfst -lngram
+	@echo 'Finished building target'
+	@echo ' '
+
 main.o : main.cpp
 	@echo 'Building file: main.cpp'
 	@echo 'Invoking: GCC C++ Compiler'
@@ -6,13 +13,6 @@ main.o : main.cpp
 	@echo ' '
 
 all : decipher
-
-decipher : main.o
-	@echo 'Building target: main.o'
-	@echo 'Invoking linker'
-	g++ -L/usr/local/lib/ -o "decipher" "main.o" -lfst -lngram
-	@echo 'Finished building target'
-	@echo ' '
 
 clean :
 	rm "main.d" "main.o"
