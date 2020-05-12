@@ -27,7 +27,7 @@ using namespace fst;
 // Default hyperparameter settings
 int seed = 0;
 int batch_size = 10;
-int upgrade_lm_every = 50;
+int upgrade_lm_every = 100;
 int upgrade_lm_by = 1;
 int max_delay = 2;
 float freeze_at = -1; // no freezing
@@ -281,9 +281,9 @@ int main(int argc, char* argv[]) {
 			std::cout << "Initializing with the " << prior << " prior\n";
 		}
 
-		Trainer hmmTrainer(lmFstArray, max_delay, &origIndexer, &latinIndexer, seed, priorMappings,
+		Trainer trainer(lmFstArray, max_delay, &origIndexer, &latinIndexer, seed, priorMappings,
 				no_epsilons, freeze_at);
-		hmmTrainer.train(monolingualTrain, devData, testData, output_dir, batch_size, upgrade_lm_every,
+		trainer.train(monolingualTrain, devData, testData, output_dir, batch_size, upgrade_lm_every,
 				upgrade_lm_by, PHI_MATCH, true, no_save);
 
 	}

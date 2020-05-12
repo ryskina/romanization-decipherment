@@ -225,8 +225,10 @@ public:
 		if (myfile.is_open()) {
 			while (getline(myfile,latinString)) {
 				getline(myfile,origString);
-				latinString.erase(std::remove(latinString.begin(), latinString.end(), '#'), latinString.end());
-				origString.erase(std::remove(origString.begin(), origString.end(), '#'), origString.end());
+				latinString.erase(
+						std::remove(latinString.begin(), latinString.end(), '#'), latinString.end());
+				origString.erase(
+						std::remove(origString.begin(), origString.end(), '#'), origString.end());
 				if (latinString.size() <= max_len) {
 					out->readLatinString(latinString);
 					out->readOrigString(origString);
