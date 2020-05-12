@@ -1,0 +1,2 @@
+data/ar.tgz filter=lfs diff=lfs merge=lfs -text
+data/ru.tgz filter=lfs diff=lfs merge=lfs -text

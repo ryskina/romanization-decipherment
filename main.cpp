@@ -203,27 +203,27 @@ int main(int argc, char* argv[]) {
 	mkdir(output_dir.c_str(), 0777);
 	std::cout << "Saving models and output files to " << output_dir << std::endl;
 
-	Indexer origIndexer = Indexer(data_dir + "/orig_syms.txt");
-	Indexer latinIndexer = Indexer(data_dir + "/latin_syms.txt");
+	Indexer origIndexer = Indexer(data_dir + "/alphabet_orig.txt");
+	Indexer latinIndexer = Indexer(data_dir + "/alphabet_latin.txt");
 
 	IndexedStrings trainData(&latinIndexer, &origIndexer);
-	DataUtils::readAndIndex(data_dir + "/train.txt", &trainData);
+	DataUtils::readAndIndex(data_dir + "/data_train.txt", &trainData);
 	std::cout << "\nLoaded " << trainData.latinIndices.size() << " training sentences\n";
 
 	IndexedStrings devData(&latinIndexer, &origIndexer);
-	DataUtils::readAndIndex(data_dir + "/dev.txt", &devData);
+	DataUtils::readAndIndex(data_dir + "/data_dev.txt", &devData);
 	std::cout << "Loaded " << devData.latinIndices.size() << " validation sentence pairs\n";
 
 	IndexedStrings testData(&latinIndexer, &origIndexer);
 	if (!no_test) {
-		DataUtils::readAndIndex(data_dir + "/test.txt", &testData);
+		DataUtils::readAndIndex(data_dir + "/data_test.txt", &testData);
 		std::cout << "Loaded " << testData.latinIndices.size() << " test sentence pairs\n";
 	} else {
 		std::cout << "Testing turned off\n";
 	}
 
 	IndexedStrings lmTrainData(&latinIndexer, &origIndexer);
-	DataUtils::readAndIndex(data_dir + "/lm.txt", &lmTrainData);
+	DataUtils::readAndIndex(data_dir + "/data_lm.txt", &lmTrainData);
 	std::cout << "Loaded " << lmTrainData.latinIndices.size() << " monolingual LM training sentences\n";
 
 	if (!latinIndexer.locked) latinIndexer.lock();
@@ -276,7 +276,7 @@ int main(int argc, char* argv[]) {
 
 		std::vector<std::pair<int, int>> priorMappings;
 		if (prior != "uniform") {
-			std::string priorFname = data_dir + "/" + prior + ".txt";
+			std::string priorFname = data_dir + "/prior_" + prior + ".txt";
 			priorMappings = DataUtils::readPrior(priorFname, &latinIndexer, &origIndexer);
 			std::cout << "Initializing with the " << prior << " prior\n";
 		}
