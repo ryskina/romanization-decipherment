@@ -46,10 +46,10 @@ bool no_save = false;
 
 void PrintHelp() {
     std::cout <<
-    	"USAGE (supervised):\n"
+    	"USAGE (unsupervised):\n"
     	"  ./decipher --dataset {ru|ar} [--seed S] [--batch-size B] [--upgrade-lm-every E] [--upgrade-lm-by U]"
     	" [--prior {phonetic|visual|combined}] [--freeze-at F] [--no-epsilons] [--no-test] [--no-save]\n"
-        "USAGE (unsupervised):\n"
+        "USAGE (supervised):\n"
         "  ./decipher --dataset {ru|ar} --supervised [--seed S] [--batch-size B] [--no-test] [--no-save]\n\n"
     	"OPTIONS:\n"
 		"--dataset {ru|ar}:                    Dataset (Russian or Arabic; mandatory parameter)\n"
