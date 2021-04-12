@@ -24,44 +24,44 @@ using namespace fst;
 class EmissionLogExpSemiring {
 public:
 	EmissionFst<ExpVecArc> fst;
-	int origAlphSize;
-	int latinAlphSize;
+	int targetAlphSize;
+	int sourceAlphSize;
 	int max_delay;
 
 	// Initializing emission parameters with uniform + random noise (from seed)
-	EmissionLogExpSemiring(int md, size_t oa, size_t la, int seed) :
-		fst(md, oa, la, VecWeight::One()) {
+	EmissionLogExpSemiring(int md, size_t trg_a, size_t src_a, int seed) :
+		fst(md, trg_a, src_a, VecWeight::One()) {
 
-		origAlphSize = oa;
-		latinAlphSize = la;
+		targetAlphSize = trg_a;
+		sourceAlphSize = src_a;
 		max_delay = md;
 		if (md == 0) {
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(origAlphSize, fst.orig_epsilon);
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(latinAlphSize, fst.latin_epsilon);
+			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
+			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
 			Compose(epsFilterInput, fst, &fst);
 			Compose(fst, epsFilterOutput, &fst);
 		}
 
 		VecWeight initLp = addNoise(fst.arcIndexer.size(), fst.getLogProbs(), seed);
-		fst = EmissionFst<ExpVecArc>(md, oa, la, initLp);
+		fst = EmissionFst<ExpVecArc>(md, trg_a, src_a, initLp);
 	};
 
 	// Initializing emission parameters with fixed values (e.g. from prior)
-	EmissionLogExpSemiring(int md, size_t oa, size_t la, VecWeight lp = VecWeight::One()) :
-		fst(md, oa, la, lp) {
+	EmissionLogExpSemiring(int md, size_t trg_a, size_t src_a, VecWeight lp = VecWeight::One()) :
+		fst(md, trg_a, src_a, lp) {
 
-		origAlphSize = oa;
-		latinAlphSize = la;
+		targetAlphSize = trg_a;
+		sourceAlphSize = src_a;
 		max_delay = md;
 		if (md == 0) {
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(origAlphSize, fst.orig_epsilon);
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(latinAlphSize, fst.latin_epsilon);
+			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
+			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
 			Compose(epsFilterInput, fst, &fst);
 			Compose(fst, epsFilterOutput, &fst);
 		}
 	};
 
-	VecWeight train(std::vector<std::vector<int>> origIndicesVector, std::vector<std::vector<int>> latinIndicesVector,
+	VecWeight train(std::vector<std::vector<int>> targetIndicesVector, std::vector<std::vector<int>> sourceIndicesVector,
 			bool verbose = false) {
 		std::clock_t start;
 		double elapsed;
@@ -73,7 +73,7 @@ public:
 		float prevMll = INFINITY;
 		int iter = 1;
 		float convergenceThreshold = 1.05;
-		int step = div(origIndicesVector.size(), 10).quot;
+		int step = div(targetIndicesVector.size(), 10).quot;
 
 		while (true) {
 			std::cout << "ITERATION " << iter << std::endl;
@@ -83,25 +83,25 @@ public:
 			int diffSkipCount = 0;
 
 			Adder<VecWeight> final;
-			for (int i = 0; i < origIndicesVector.size(); i++) {
-				std::vector<int> origIndices = origIndicesVector[i];
-				std::vector<int> latinIndices = latinIndicesVector[i];
+			for (int i = 0; i < targetIndicesVector.size(); i++) {
+				std::vector<int> targetIndices = targetIndicesVector[i];
+				std::vector<int> sourceIndices = sourceIndicesVector[i];
 
-				VectorFst<ExpVecArc> input = constructInput<ExpVecArc>(origIndices, fst.orig_epsilon);
-				VectorFst<ExpVecArc> output = constructOutput<ExpVecArc>(latinIndices, fst.latin_epsilon);
+				VectorFst<ExpVecArc> input = constructInput<ExpVecArc>(targetIndices, fst.target_epsilon);
+				VectorFst<ExpVecArc> output = constructOutput<ExpVecArc>(sourceIndices, fst.source_epsilon);
 
 				VectorFst<ExpVecArc> lattice;
 				Compose<ExpVecArc>(input, (VectorFst<ExpVecArc>)fst, &lattice);
 				Compose<ExpVecArc>(lattice, output, &lattice);
 
 				if (lattice.NumStates() == 0) {
-					int diff = latinIndices.size() - origIndices.size();
+					int diff = sourceIndices.size() - targetIndices.size();
 					if (diff > max_delay) diffSkipCount++;
 					skipCount++;
 					continue;
 				}
 
-				numTokens += latinIndices.size();
+				numTokens += sourceIndices.size();
 
 				VecWeight out;
 				LogWeight ll;
@@ -115,7 +115,7 @@ public:
 				mll += ll.Value();
 				final.Add(Divide(out, ll));
 
-				if (((i+1) % step == 0 || i == origIndicesVector.size() - 1) && verbose) {
+				if (((i+1) % step == 0 || i == targetIndicesVector.size() - 1) && verbose) {
 					elapsed = (std::clock() - start) / (double) CLOCKS_PER_SEC;
 					std::cout << "String pairs processed: " << (i + 1) << "; of them skipped: " <<
 							skipCount << "; time elapsed: " << elapsed << std::endl;
@@ -125,7 +125,7 @@ public:
 			std::cout<<"Log-likelihood of training data: "<< mll << std::endl;
 			if (skipCount > 0) {
 				std::cout << "Skipped due to composition failure: " << skipCount <<
-						" out of " << origIndicesVector.size();
+						" out of " << targetIndicesVector.size();
 				std::cout << "; of them " << diffSkipCount << " due to delay over "
 						<< max_delay << std::endl;
 			}
@@ -138,7 +138,7 @@ public:
 
 			// Normalizing expected counts collected over entire corpus
 			emProbs = fst.normalize(final.Sum());
-			fst = EmissionFst<ExpVecArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
+			fst = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
 			if (prevMll - mll <= log(convergenceThreshold) || iter == max_iter) break;
 			prevMll = mll;
 			mll = 0;
@@ -169,19 +169,19 @@ protected:
 class EmissionTropicalSemiring {
 public:
 	EmissionFst<StdArc> fst;
-	int origAlphSize;
-	int latinAlphSize;
+	int targetAlphSize;
+	int sourceAlphSize;
 	int max_delay;
 
-	EmissionTropicalSemiring(int md, size_t oa, size_t la, VecWeight lp) :
-		fst(md, oa, la, lp) {
+	EmissionTropicalSemiring(int md, size_t trg_a, size_t la, VecWeight lp) :
+		fst(md, trg_a, la, lp) {
 
-		origAlphSize = oa;
-		latinAlphSize = la;
+		targetAlphSize = trg_a;
+		sourceAlphSize = la;
 		max_delay = md;
 		if (md == 0) {
-			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterInput(origAlphSize, fst.orig_epsilon);
-			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterOutput(latinAlphSize, fst.latin_epsilon);
+			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
+			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
 			Compose(epsFilterInput, fst, &fst);
 			Compose(fst, epsFilterOutput, &fst);
 		}
@@ -189,7 +189,7 @@ public:
 
 	// Collecting a set of all allowed emission labels
 	std::vector<bool> getOIndices() {
-		std::vector<bool> res(latinAlphSize + 1, false);
+		std::vector<bool> res(sourceAlphSize + 1, false);
 		for (ArcIterator<VectorFst<StdArc>> aiter(fst, fst.Start()); !aiter.Done(); aiter.Next()) {
 			const StdArc &arc = aiter.Value();
 			res[arc.olabel] = true;
@@ -199,15 +199,15 @@ public:
 };
 
 // Training the emission WFST on supervised data
-EmissionTropicalSemiring trainEmission(IndexedStrings data, int max_delay, int origAlphSize, int latinAlphSize,
+EmissionTropicalSemiring trainEmission(IndexedStrings data, int max_delay, int targetAlphSize, int sourceAlphSize,
 		int seed, std::string output_dir, bool no_save = false) {
 
-	EmissionLogExpSemiring logExpEm(max_delay, origAlphSize, latinAlphSize, seed);
-	VecWeight emProbs = logExpEm.train(data.origIndices, data.latinIndices, true);
+	EmissionLogExpSemiring logExpEm(max_delay, targetAlphSize, sourceAlphSize, seed);
+	VecWeight emProbs = logExpEm.train(data.targetIndices, data.sourceIndices, true);
 
 	std::cout << "Emission model (expectation semiring): " << logExpEm.fst.NumStates() << " states, "
 			<< logExpEm.fst.getNumArcs() << " arcs\n";
-	EmissionTropicalSemiring tropicalEm(max_delay, origAlphSize, latinAlphSize, emProbs);
+	EmissionTropicalSemiring tropicalEm(max_delay, targetAlphSize, sourceAlphSize, emProbs);
 	std::cout << "Emission model (tropical semiring): " << tropicalEm.fst.NumStates() << " states, "
 			<< tropicalEm.fst.getNumArcs() << " arcs\n";
 

@@ -73,7 +73,7 @@ public:
 	}
 
 	void printProbsWithLabels(VecWeight out, Indexer *oIPtr, Indexer *lIPtr,
-			int o_eps, int l_eps, float min_value = 0) {
+			int trg_eps, int src_eps, float min_value = 0) {
 		std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> cv;
 
 		for (int i=0; i < arcIndexer.size(); i++) {
@@ -83,13 +83,13 @@ public:
 				// Not printing values under min_value
 				if (prob > min_value) {
 					std::cout << "arc "<< i << ": ";
-					if (arcIndexer[i].first == o_eps) {
-						std::cout << "<o_eps>->";
+					if (arcIndexer[i].first == trg_eps) {
+						std::cout << "<trg_eps>->";
 					} else {
 						std::cout << cv.to_bytes(oIPtr->lookup[arcIndexer[i].first]) << "->";
 					}
-					if (arcIndexer[i].second == l_eps) {
-						std::cout << "<l_eps>";
+					if (arcIndexer[i].second == src_eps) {
+						std::cout << "<src_eps>";
 					} else {
 						std::cout << cv.to_bytes(lIPtr->lookup[arcIndexer[i].second]);
 					}
@@ -124,7 +124,7 @@ public:
 
 	// Normalize expected counts by input label,
 	// with freezing insertion and deletion probabilities at freezeProb
-	VecWeight normalizeFrozen(VecWeight counts, float freezeProb, int o_eps, int l_eps) {
+	VecWeight normalizeFrozen(VecWeight counts, float freezeProb, int trg_eps, int src_eps) {
 		VecWeight out;
 		Adder<VecWeight> z; //normalizer
 		LogWeight normalizerAdjustment = LogWeight(-log1p(-exp(-freezeProb)));
@@ -132,7 +132,7 @@ public:
 		for (int i = 0; i < arcIndexer.size(); i++) {
 			int idxFrom = arcIndexer[i].first;
 			int idxTo = arcIndexer[i].second;
-			if (idxFrom == o_eps || idxTo == l_eps) continue;
+			if (idxFrom == trg_eps || idxTo == src_eps) continue;
 			VecWeight convertedCount = VecWeight(idxFrom, counts.Value(i), LogWeight::Zero());
 			z.Add(convertedCount);
 		}
@@ -140,7 +140,7 @@ public:
 		for (int i = 0; i < arcIndexer.size(); i++) {
 			int idxFrom = arcIndexer[i].first;
 			int idxTo = arcIndexer[i].second;
-			if (idxFrom == o_eps || idxTo == l_eps){
+			if (idxFrom == trg_eps || idxTo == src_eps){
 				out.SetValue(i, LogWeight(freezeProb));
 			} else if (z.Sum().Value(idxFrom) == LogWeight::Zero()) {
 				out.SetValue(i, LogWeight::Zero());
@@ -173,14 +173,14 @@ using W = typename A::Weight;
 using VecWeight = SparsePowerWeight<LogWeight>;
 public:
 	int max_delay;     // maximum allowed delay of a path
-	int latin_epsilon; // special deletion symbol index
-	int orig_epsilon;  // special insertion symbol index
+	int source_epsilon; // special deletion symbol index
+	int target_epsilon;  // special insertion symbol index
 
-	EmissionFst(int max_delay, size_t origAlphSize, size_t latinAlphSize, VecWeight lp,
+	EmissionFst(int max_delay, size_t targetAlphSize, size_t sourceAlphSize, VecWeight lp,
 			float freezeProb = -1) {
 		this->setLogProbs(lp);
-		latin_epsilon = latinAlphSize + 1;
-		orig_epsilon = origAlphSize + 1;
+		source_epsilon = sourceAlphSize + 1;
+		target_epsilon = targetAlphSize + 1;
 		this->max_delay = max_delay;
 
 		// Creating states
@@ -192,16 +192,16 @@ public:
 		this->SetStart(max_delay);
 
 		// Creating the emission arcs
-		for (int i = 1; i < origAlphSize + 1; i++) {
-			for (int j = 1; j < latinAlphSize + 1; j++) {
+		for (int i = 1; i < targetAlphSize + 1; i++) {
+			for (int j = 1; j < sourceAlphSize + 1; j++) {
 				addEmissionArc(i, j);
 			}
-			// Creating deletion arcs (original symbol -> latin_epsilon)
+			// Creating deletion arcs (target symbol -> source_epsilon)
 			addDeletionArc(i, freezeProb);
 		}
 
-		// Creating insertion arcs (original_epsilon -> Latin symbol)
-		for (int j = 1; j < latinAlphSize + 1; j++) {
+		// Creating insertion arcs (target_epsilon -> source symbol)
+		for (int j = 1; j < sourceAlphSize + 1; j++) {
 			addInsertionArc(j, freezeProb);
 		}
 	}
@@ -223,15 +223,15 @@ protected:
 
 	void addDeletionArc(int ilabel, float freezeProb = -1) {
 		// Creating the corresponding deletion arc for each state simultaneously
-		this->arcIndexer.push_back({ilabel, latin_epsilon});
+		this->arcIndexer.push_back({ilabel, source_epsilon});
 		int arcIndex = this->arcIndexer.size() - 1;
 		W weight = this->getArcWeight(arcIndex, freezeProb);
 		if (weight != W::Zero()) {
 			if (max_delay == 0) {
-				this->AddArc(0, A(ilabel, latin_epsilon, weight, 0));
+				this->AddArc(0, A(ilabel, source_epsilon, weight, 0));
 			} else {
 				for (int state = 0; state < 2 * max_delay; state++) {
-					this->AddArc(state, A(ilabel, latin_epsilon, weight, state+1));
+					this->AddArc(state, A(ilabel, source_epsilon, weight, state+1));
 				}
 			}
 		}
@@ -239,15 +239,15 @@ protected:
 
 	void addInsertionArc(int olabel, float freezeProb = -1) {
 		// Creating the corresponding insertion arc for each state simultaneously
-		this->arcIndexer.push_back({orig_epsilon, olabel});
+		this->arcIndexer.push_back({target_epsilon, olabel});
 		int arcIndex = this->arcIndexer.size() - 1;
 		W weight = this->getArcWeight(arcIndex, freezeProb);
 		if (weight != W::Zero()) {
 			if (max_delay == 0) {
-				this->AddArc(0, A(orig_epsilon, olabel, weight, 0));
+				this->AddArc(0, A(target_epsilon, olabel, weight, 0));
 			} else {
 				for (int state = 0; state < 2 * max_delay; state++) {
-					this->AddArc(state+1, A(orig_epsilon, olabel, weight, state));
+					this->AddArc(state+1, A(target_epsilon, olabel, weight, state));
 				}
 			}
 		}

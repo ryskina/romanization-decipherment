@@ -43,7 +43,9 @@ public:
 	 *          inserted, deleted or substituted with their equivalent
 	 *    * symbols indexed 30 through alphabetSize are the remaining characters
 	 *    * symbol indexed alphabetSize + 1 corresponds to an epsilon-transition
-	 *          (insertion for Latin, deletion for original)
+	 *          (insertion for source, deletion for target)
+	 *
+	 *     TODO: remove punctuation assumptions
 	 *
 	 * Index 0 is reserved in OpenFST for epsilon and is not used in this implementation.
 	 * We replace it with separate insertion and deletion symbols described above to avoid composition issues
@@ -152,55 +154,55 @@ public:
 // Data structure storing parallel data in indexed form
 class IndexedStrings {
 public:
-	Indexer *latinIndexerPtr;
-	Indexer *origIndexerPtr;
-	std::vector<std::vector<int>> latinIndices;
-	std::vector<std::vector<int>> origIndices;
+	Indexer *sourceIndexerPtr;
+	Indexer *targetIndexerPtr;
+	std::vector<std::vector<int>> sourceIndices;
+	std::vector<std::vector<int>> targetIndices;
 
-	IndexedStrings(Indexer *lIPtr, Indexer *oIPtr) {
-		latinIndexerPtr = lIPtr;
-		origIndexerPtr = oIPtr;
+	IndexedStrings(Indexer *srcIPtr, Indexer *trgIPtr) {
+		sourceIndexerPtr = srcIPtr;
+		targetIndexerPtr = trgIPtr;
 	}
 
-	void readLatinString(std::string latinString) {
-		std::vector<int> indices = latinIndexerPtr->index(latinString);
-		latinIndices.push_back(indices);
+	void readsourceString(std::string sourceString) {
+		std::vector<int> indices = sourceIndexerPtr->index(sourceString);
+		sourceIndices.push_back(indices);
 	}
 
-	void readOrigString(std::string origString) {
-		std::vector<int> indices = origIndexerPtr->index(origString);
-		origIndices.push_back(indices);
+	void readtargetString(std::string targetString) {
+		std::vector<int> indices = targetIndexerPtr->index(targetString);
+		targetIndices.push_back(indices);
 	}
 
 	void append(const IndexedStrings& a) {
-		latinIndices.insert(latinIndices.end(), a.latinIndices.begin(), a.latinIndices.end());
-		origIndices.insert(origIndices.end(), a.origIndices.begin(), a.origIndices.end());
+		sourceIndices.insert(sourceIndices.end(), a.sourceIndices.begin(), a.sourceIndices.end());
+		targetIndices.insert(targetIndices.end(), a.targetIndices.begin(), a.targetIndices.end());
 	}
 
 	int size() {
-		return latinIndices.size();
+		return sourceIndices.size();
 	}
 
 };
 
-// An FST used to compute edit distance between strings in the original alphabet
+// An FST used to compute edit distance between strings in the target alphabet
 class EditDistanceFst : public VectorFst<StdArc> {
 public:
-	EditDistanceFst(int origAlphSize) {
+	EditDistanceFst(int targetAlphSize) {
 		this->AddState();
 		this->SetStart(0);
 		this->SetFinal(0, TropicalWeight::One());
 
-		for (int i = 1; i < origAlphSize + 1; i++) {
+		for (int i = 1; i < targetAlphSize + 1; i++) {
 			this->AddArc(0, StdArc(0, i, TropicalWeight(1), 0));
 		}
 
-		for (int i = 1; i < origAlphSize + 1; i++) {
+		for (int i = 1; i < targetAlphSize + 1; i++) {
 			for (int j = 0; j < i; j++) {
 				this->AddArc(0, StdArc(i, j, TropicalWeight(1), 0));
 			}
 			this->AddArc(0, StdArc(i, i, TropicalWeight(0), 0));
-			for (int j = i+1; j < origAlphSize + 1; j++) {
+			for (int j = i+1; j < targetAlphSize + 1; j++) {
 				this->AddArc(0, StdArc(i, j, TropicalWeight(1), 0));
 			}
 		}
@@ -217,21 +219,21 @@ public:
 	}
 
 	static void readAndIndex(std::string path, IndexedStrings *out, int max_len = 10000) {
-		std::string latinString;
-		std::string origString;
+		std::string sourceString;
+		std::string targetString;
 
 		std::ifstream myfile(path);
 
 		if (myfile.is_open()) {
-			while (getline(myfile,latinString)) {
-				getline(myfile,origString);
-				latinString.erase(
-						std::remove(latinString.begin(), latinString.end(), '#'), latinString.end());
-				origString.erase(
-						std::remove(origString.begin(), origString.end(), '#'), origString.end());
-				if (latinString.size() <= max_len) {
-					out->readLatinString(latinString);
-					out->readOrigString(origString);
+			while (getline(myfile,sourceString)) {
+				getline(myfile,targetString);
+				sourceString.erase(
+						std::remove(sourceString.begin(), sourceString.end(), '#'), sourceString.end());
+				targetString.erase(
+						std::remove(targetString.begin(), targetString.end(), '#'), targetString.end());
+				if (sourceString.size() <= max_len) {
+					out->readsourceString(sourceString);
+					out->readtargetString(targetString);
 				} else continue;
 			}
 			myfile.close();
@@ -252,7 +254,7 @@ public:
 		return dist[0].Value();
 	}
 
-	static std::vector<std::pair<int, int>> readPrior(std::string path, Indexer *lIPtr, Indexer *oIPtr) {
+	static std::vector<std::pair<int, int>> readPrior(std::string path, Indexer *srcIPtr, Indexer *trgIPtr) {
 		std::string line;
 		std::ifstream myfile(path);
 		std::vector<std::pair<int, int>> res;
@@ -260,9 +262,9 @@ public:
 		if (myfile.is_open()) {
 			while (getline(myfile,line)) {
 				line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
-				std::vector<int> lIndices = lIPtr->index(line.substr(0, 1));
+				std::vector<int> lIndices = srcIPtr->index(line.substr(0, 1));
 				assert(lIndices.size() == 1);
-				std::vector<int> oIndices = oIPtr->index(line.substr(1));
+				std::vector<int> oIndices = trgIPtr->index(line.substr(1));
 				for (int &oIndex : oIndices) {
 					res.push_back({oIndex, lIndices[0]});
 				}

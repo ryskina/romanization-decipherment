@@ -28,21 +28,21 @@ enum LmComposeType {
   EPSILON_MATCH = 2,  // treating backoff arcs as epsilon transitions
 };
 
-VectorFst<StdArc> trainLmOpenGRM(IndexedStrings trainData, int origAlphSize, int order, std::string output_dir,
+VectorFst<StdArc> trainLmOpenGRM(IndexedStrings trainData, int targetAlphSize, int order, std::string output_dir,
 		bool no_save = false, bool no_epsilons = false, int trainDataSize = 1000000) {
 	std::clock_t start;
 	double elapsed;
 	start = std::clock();
 
-	if (trainDataSize > trainData.origIndices.size()) {
-		trainDataSize = trainData.origIndices.size();
+	if (trainDataSize > trainData.targetIndices.size()) {
+		trainDataSize = trainData.targetIndices.size();
 	}
 
 	int step = div(trainDataSize, 10).quot;
 	NGramCounter<LogWeight> counter(order);
 
 	for (int i = 0; i < trainDataSize; i++) {
-		std::vector<int> indices = trainData.origIndices[i];
+		std::vector<int> indices = trainData.targetIndices[i];
 		VectorFst<LogArc> input = constructAcceptor<LogArc>(indices);
 
 		counter.Count(input);
@@ -86,9 +86,9 @@ VectorFst<StdArc> trainLmOpenGRM(IndexedStrings trainData, int origAlphSize, int
 	}
 
 	if (!no_epsilons) {
-		// Adding original_epsilon (insertion) loop for each LM state
+		// Adding target_epsilon (insertion) loop for each LM state
 		for (int i = 0; i < lmFst.NumStates(); i++) {
-			lmFst.AddArc(i, StdArc(origAlphSize+1, origAlphSize+1, TropicalWeight::One(), i));
+			lmFst.AddArc(i, StdArc(targetAlphSize+1, targetAlphSize+1, TropicalWeight::One(), i));
 		}
 	}
 

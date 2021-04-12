@@ -29,7 +29,7 @@ int seed = 0;
 int batch_size = 10;
 int upgrade_lm_every = 100;
 int upgrade_lm_by = 1;
-int max_delay = 2;
+int max_delay = 0;
 float freeze_at = -1; // no freezing
 
 std::string dataset;
@@ -47,12 +47,13 @@ bool no_save = false;
 void PrintHelp() {
     std::cout <<
     	"USAGE (unsupervised):\n"
-    	"  ./decipher --dataset {ru|ar} [--seed S] [--batch-size B] [--upgrade-lm-every E] [--upgrade-lm-by U]"
+    	"  ./decipher --dataset {ru|ar|...} [--seed S] [--batch-size B] [--upgrade-lm-every E] [--upgrade-lm-by U]"
     	" [--prior {phonetic|visual|combined}] [--freeze-at F] [--no-epsilons] [--no-test] [--no-save]\n"
         "USAGE (supervised):\n"
-        "  ./decipher --dataset {ru|ar} --supervised [--seed S] [--batch-size B] [--no-test] [--no-save]\n\n"
+        "  ./decipher --dataset {ru|ar|...} --supervised [--seed S] [--batch-size B] [--no-test] [--no-save]\n\n"
     	"OPTIONS:\n"
-		"--dataset {ru|ar}:                    Dataset (Russian or Arabic; mandatory parameter)\n"
+		"--dataset {ru|ar|...}:                Dataset (mandatory parameter)\n"
+    	"--max-delay M                         Maximum delay of FST path (default ru=2, ar=5)\n"
 		"--seed S:                             Set random seed to S (int; default 0)\n"
 		"--batch-size B:                       Mini-batch size for stepwise EM training "
 		                                       "(unsupervised only; int; default 10)\n"
@@ -77,6 +78,7 @@ void ProcessArgs(int argc, char* argv[]) {
     const char* const short_opts = "d:n:b:e:u:p:f:srtvh";
     const option long_opts[] = {
 		{"dataset", required_argument, nullptr, 'd'},
+		{"max-delay", required_argument, nullptr, 'm'},
 		{"seed", required_argument, nullptr, 'n'},
 		{"batch-size", required_argument, nullptr, 'b'},
 		{"upgrade-lm-every", required_argument, nullptr, 'e'},
@@ -101,12 +103,11 @@ void ProcessArgs(int argc, char* argv[]) {
         {
         case 'd':
             dataset = std::string(optarg);
-            if (dataset != "ru" && dataset != "ar") {
-            	std::cout << "Error: Unknown dataset option: " << dataset << std::endl;
-            	PrintHelp();
-            	break;
-            }
             std::cout << "Dataset: " << dataset << std::endl;
+            break;
+
+        case 'm':
+            max_delay = std::stoi(optarg);
             break;
 
         case 'n':
@@ -166,7 +167,11 @@ void ProcessArgs(int argc, char* argv[]) {
     	std::cout << "Error: No dataset specified\n";
     	PrintHelp();
     } else {
-    	if (dataset == "ar") max_delay = 5;
+    	if (max_delay == 0) {
+    		if (dataset == "ar") max_delay = 5;
+    		if (dataset == "ru") max_delay = 2;
+    	}
+    	// TODO: configure max_delay = 0 to mean unrestricted delay
     	std::cout << "Maximum emission model delay: " << max_delay << std::endl;
     }
 
@@ -210,40 +215,43 @@ int main(int argc, char* argv[]) {
 	mkdir(output_dir.c_str(), 0777);
 	std::cout << "Saving models and output files to " << output_dir << std::endl;
 
-	Indexer origIndexer = Indexer(data_dir + "/alphabet_orig.txt");
-	Indexer latinIndexer = Indexer(data_dir + "/alphabet_latin.txt");
+	/*
+	 * For romanization decipherment, source is Romanized and target is original script
+	 */
+	Indexer targetIndexer = Indexer(data_dir + "/alphabet_target.txt");
+	Indexer sourceIndexer = Indexer(data_dir + "/alphabet_source.txt");
 
-	IndexedStrings trainData(&latinIndexer, &origIndexer);
+	IndexedStrings trainData(&sourceIndexer, &targetIndexer);
 	DataUtils::readAndIndex(data_dir + "/data_train.txt", &trainData);
-	std::cout << "\nLoaded " << trainData.latinIndices.size() << " training sentences\n";
+	std::cout << "\nLoaded " << trainData.sourceIndices.size() << " source training sentences\n";
 
-	IndexedStrings devData(&latinIndexer, &origIndexer);
+	IndexedStrings devData(&sourceIndexer, &targetIndexer);
 	DataUtils::readAndIndex(data_dir + "/data_dev.txt", &devData);
-	std::cout << "Loaded " << devData.latinIndices.size() << " validation sentence pairs\n";
+	std::cout << "Loaded " << devData.sourceIndices.size() << " validation sentence pairs\n";
 
-	IndexedStrings testData(&latinIndexer, &origIndexer);
+	IndexedStrings testData(&sourceIndexer, &targetIndexer);
 	if (!no_test) {
 		DataUtils::readAndIndex(data_dir + "/data_test.txt", &testData);
-		std::cout << "Loaded " << testData.latinIndices.size() << " test sentence pairs\n";
+		std::cout << "Loaded " << testData.sourceIndices.size() << " test sentence pairs\n";
 	} else {
 		std::cout << "Testing turned off\n";
 	}
 
-	IndexedStrings lmTrainData(&latinIndexer, &origIndexer);
+	IndexedStrings lmTrainData(&sourceIndexer, &targetIndexer);
 	DataUtils::readAndIndex(data_dir + "/data_lm.txt", &lmTrainData);
-	std::cout << "Loaded " << lmTrainData.latinIndices.size() << " monolingual LM training sentences\n";
+	std::cout << "Loaded " << lmTrainData.sourceIndices.size() << " monolingual target LM training sentences\n";
 
-	if (!latinIndexer.locked) latinIndexer.lock();
-	if (!origIndexer.locked) origIndexer.lock();
+	if (!sourceIndexer.locked) sourceIndexer.lock();
+	if (!targetIndexer.locked) targetIndexer.lock();
 
 	if (run_supervised) {
-		std::cout << "\nTraining the language model of the original orthography...\n";
-		VectorFst<StdArc> lmFst = trainLmOpenGRM(lmTrainData, origIndexer.getSize(), 6, output_dir, no_save);
+		std::cout << "\nTraining the language model of the target side...\n";
+		VectorFst<StdArc> lmFst = trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), 6, output_dir, no_save);
 		std::cout << "Done\n";
 
 		std::cout << "\nTraining the emission model on validation data...\n";
-		EmissionTropicalSemiring tropicalEm = trainEmission(devData, max_delay, origIndexer.getSize(),
-				latinIndexer.getSize(), seed, output_dir, no_save);
+		EmissionTropicalSemiring tropicalEm = trainEmission(devData, max_delay, targetIndexer.getSize(),
+				sourceIndexer.getSize(), seed, output_dir, no_save);
 		std::cout << "Done\n";
 
 		Model model(lmFst, tropicalEm);
@@ -264,12 +272,12 @@ int main(int argc, char* argv[]) {
 			std::cout << "CER: " << cer << std::endl;
 		} else {
 			// Printing the emission parameters
-			model.emStd.printProbsWithLabels(model.emStd.logProbs, &origIndexer,
-					&latinIndexer, model.emStd.orig_epsilon, model.emStd.latin_epsilon);
+			model.emStd.printProbsWithLabels(model.emStd.logProbs, &targetIndexer,
+					&sourceIndexer, model.emStd.target_epsilon, model.emStd.source_epsilon);
 		}
 
 	} else {
- 		std::vector<std::vector<int>> monolingualTrain = trainData.latinIndices;
+ 		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
 
@@ -278,17 +286,17 @@ int main(int argc, char* argv[]) {
 		// While insertion/deletion probabilities are kept frozen,
 		// the language model disallows epsilons (insertions) to keep the model locally normalized
 		for (int order = 2; order <= 6; order++) lmFstArray.push_back(
-				trainLmOpenGRM(lmTrainData, origIndexer.getSize(), order, output_dir, no_save,
+				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), order, output_dir, no_save,
 						no_epsilons || (freeze_at >= 0 && order == 2)));
 
 		std::vector<std::pair<int, int>> priorMappings;
 		if (prior != "uniform") {
 			std::string priorFname = data_dir + "/prior_" + prior + ".txt";
-			priorMappings = DataUtils::readPrior(priorFname, &latinIndexer, &origIndexer);
+			priorMappings = DataUtils::readPrior(priorFname, &sourceIndexer, &targetIndexer);
 			std::cout << "Initializing with the " << prior << " prior\n";
 		}
 
-		Trainer trainer(lmFstArray, max_delay, &origIndexer, &latinIndexer, seed, priorMappings,
+		Trainer trainer(lmFstArray, max_delay, &targetIndexer, &sourceIndexer, seed, priorMappings,
 				no_epsilons, freeze_at);
 		trainer.train(monolingualTrain, devData, testData, output_dir, batch_size, upgrade_lm_every,
 				upgrade_lm_by, PHI_MATCH, true, no_save);

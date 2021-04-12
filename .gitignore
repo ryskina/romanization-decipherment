@@ -1,6 +1,9 @@
 .DS_Store
+.cproject
+.project
 
-outputs/*
+output/*
+scripts/*
 Debug/*
 Release/*
 

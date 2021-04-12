@@ -28,37 +28,37 @@ public:
 	VectorFst<StdArc> lmStd;
 	EmissionFst<StdArc> emStd;
 	EditDistanceFst evalFst;
-	int origAlphSize;
-	int latinAlphSize;
-	int orig_epsilon;
-	int latin_epsilon;
+	int targetAlphSize;
+	int sourceAlphSize;
+	int target_epsilon;
+	int source_epsilon;
 	int max_delay;
 	bool no_epsilons = false;
 	float freeze_at = -1;
 
 	// Marking symbols not seen in training for deletion
-	std::vector<bool> latinDelMask;
+	std::vector<bool> sourceDelMask;
 
-	Base(int md, int oa, int la, bool ne = false, float fa = -1) :
-		emStd(md, oa, la, VecWeight::One(), fa), evalFst(oa), latinDelMask(la, true) {
+	Base(int md, int trg_a, int src_a, bool ne = false, float fa = -1) :
+		emStd(md, trg_a, src_a, VecWeight::One(), fa), evalFst(trg_a), sourceDelMask(src_a, true) {
 
-		origAlphSize = oa;
-		latinAlphSize = la;
-		orig_epsilon = oa + 1;
-		latin_epsilon = la + 1;
+		targetAlphSize = trg_a;
+		sourceAlphSize = src_a;
+		target_epsilon = trg_a + 1;
+		source_epsilon = src_a + 1;
 		max_delay = md;
 		no_epsilons = ne;
 		freeze_at = fa;
 	}
 
-	// Decode an indexed Latin string into an indexed original script string
-	std::vector<int> decode(std::vector<int> latinIndices, LmComposeType composeType = PHI_MATCH,
+	// Decode an indexed source alphabet string into an indexed target alphabet string
+	std::vector<int> decode(std::vector<int> sourceIndices, LmComposeType composeType = PHI_MATCH,
 			bool verbose = false) {
 		VectorFst<StdArc> output;
 		if (!no_epsilons) {
-			output = constructOutput<StdArc>(latinIndices, latin_epsilon);
+			output = constructOutput<StdArc>(sourceIndices, source_epsilon);
 		} else {
-			output = constructAcceptor<StdArc>(latinIndices);
+			output = constructAcceptor<StdArc>(sourceIndices);
 		}
 		VectorFst<StdArc> lattice;
 
@@ -90,7 +90,7 @@ public:
 			for (ArcIterator<VectorFst<StdArc>> aiter(path, curState); !aiter.Done(); aiter.Next()) {
 				const StdArc &arc = aiter.Value();
 				curState = arc.nextstate;
-				if (arc.ilabel != 0 && arc.ilabel != orig_epsilon) out.push_back(arc.ilabel);
+				if (arc.ilabel != 0 && arc.ilabel != target_epsilon) out.push_back(arc.ilabel);
 			}
 		}
 		return out;
@@ -106,36 +106,36 @@ public:
 		std::ofstream outfile;
 		if (outfile_path != "") outfile.open(outfile_path);
 
-		for (int i = 0; i < testData.latinIndices.size(); i++) {
+		for (int i = 0; i < testData.sourceIndices.size(); i++) {
 
-			std::vector<int> origIndices = testData.origIndices[i];
-			std::vector<int> latinIndices = testData.latinIndices[i];
+			std::vector<int> targetIndices = testData.targetIndices[i];
+			std::vector<int> sourceIndices = testData.sourceIndices[i];
 
 			if (verbose) {
 				std::cout << std::endl;
-				std::cout << "Latin:      " <<
-						testData.latinIndexerPtr->encode(latinIndices) << std::endl;
+				std::cout << "Source:      " <<
+						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
 			}
 
-			int l = latinIndices.size();
+			int l = sourceIndices.size();
 			for (int pos = l - 1; pos >= 0 ; pos--) {
-				if (!latinDelMask[latinIndices[pos]]) latinIndices.erase(latinIndices.begin() + pos);
+				if (!sourceDelMask[sourceIndices[pos]]) sourceIndices.erase(sourceIndices.begin() + pos);
 			}
-			if (latinIndices.size() < l && verbose) {
+			if (sourceIndices.size() < l && verbose) {
 				std::cout << "Filtered:   " <<
-						testData.latinIndexerPtr->encode(latinIndices) << std::endl;
+						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
 			}
 
-			std::vector<int> predicted = decode(latinIndices, composeType, verbose);
+			std::vector<int> predicted = decode(sourceIndices, composeType, verbose);
 			if (predicted.size() == 0) failCount++;
 
-			distSum += DataUtils::eval(predicted, origIndices, &evalFst);
-			goldLensSum += origIndices.size();
-			std::string out = testData.origIndexerPtr->encode(predicted);
+			distSum += DataUtils::eval(predicted, targetIndices, &evalFst);
+			goldLensSum += targetIndices.size();
+			std::string out = testData.targetIndexerPtr->encode(predicted);
 
 			if (verbose) {
 				std::cout << "Prediction: " << out << std::endl;
-				std::cout << "Gold:       " << testData.origIndexerPtr->encode(origIndices) << std::endl;
+				std::cout << "Gold:       " << testData.targetIndexerPtr->encode(targetIndices) << std::endl;
 			}
 
 			if (outfile.is_open()) {
@@ -144,7 +144,7 @@ public:
 
 		}
 		if (outfile.is_open()) outfile.close();
-		std::cout << "Failed to compose " << failCount << " out of " << testData.latinIndices.size() << std::endl;
+		std::cout << "Failed to compose " << failCount << " out of " << testData.sourceIndices.size() << std::endl;
 		return distSum / goldLensSum;
 	}
 };
@@ -156,21 +156,21 @@ public:
 	EmissionFst<ExpVecArc> emExp;
 	std::vector<VectorFst<StdArc>> lmStdArray;
 
-	Indexer* origIndexerPtr;
-	Indexer* latinIndexerPtr;
+	Indexer* targetIndexerPtr;
+	Indexer* sourceIndexerPtr;
 
 	VecWeight prior = VecWeight::Zero();
 	VecWeight mu;
 	float alpha = 0.9;
 	float pseudoCount = 0;
 
-	Trainer(std::vector<VectorFst<StdArc>> lmFstArray, int md, Indexer* oIPtr, Indexer *lIPtr, int seed,
+	Trainer(std::vector<VectorFst<StdArc>> lmFstArray, int md, Indexer* trgIPtr, Indexer *srcIPtr, int seed,
 			std::vector<std::pair<int, int>> priorMappings, bool no_epsilons = false, float freeze_at = -1) :
-		Base(md, oIPtr->getSize(), lIPtr->getSize(), no_epsilons, freeze_at),
-		emExp(md, oIPtr->getSize(), lIPtr->getSize(), VecWeight::One(), freeze_at) {
+		Base(md, trgIPtr->getSize(), srcIPtr->getSize(), no_epsilons, freeze_at),
+		emExp(md, trgIPtr->getSize(), srcIPtr->getSize(), VecWeight::One(), freeze_at) {
 
-		origIndexerPtr = oIPtr;
-		latinIndexerPtr = lIPtr;
+		targetIndexerPtr = trgIPtr;
+		sourceIndexerPtr = srcIPtr;
 
 		lmStdArray = lmFstArray;
 
@@ -189,15 +189,15 @@ public:
 		Map(lmStd, &lmExp, WeightConvertMapper<StdArc, ExpVecArc>());
 
 		VecWeight emProbs = addNoise(emExp.NumArcs(0), mu, seed);
-		emExp = EmissionFst<ExpVecArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
-		emStd = EmissionFst<StdArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
+		emExp = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+		emStd = EmissionFst<StdArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
 	}
 
-	void train(std::vector<std::vector<int>> latinIndicesVector, IndexedStrings devData, IndexedStrings testData,
+	void train(std::vector<std::vector<int>> sourceIndicesVector, IndexedStrings devData, IndexedStrings testData,
 			std::string output_dir, int batchSize, int upgrade_lm_every, int upgrade_lm_by,
 			LmComposeType composeType = PHI_MATCH, bool verbose=false, bool no_save=false) {
 
-		if (batchSize > latinIndicesVector.size()) batchSize = latinIndicesVector.size();
+		if (batchSize > sourceIndicesVector.size()) batchSize = sourceIndicesVector.size();
 
 		int order = 2;
 		int k = 0;
@@ -217,15 +217,15 @@ public:
 
 		Adder<VecWeight> final;
 
-		for (int i = 0; i < latinIndicesVector.size(); i++) {
-			std::vector<int> latinIndices = latinIndicesVector[i];
-			numTokens += latinIndices.size();
+		for (int i = 0; i < sourceIndicesVector.size(); i++) {
+			std::vector<int> sourceIndices = sourceIndicesVector[i];
+			numTokens += sourceIndices.size();
 
 			VectorFst<ExpVecArc> output;
 			if (!no_epsilons) {
-				output = constructOutput<ExpVecArc>(latinIndices, latin_epsilon);
+				output = constructOutput<ExpVecArc>(sourceIndices, source_epsilon);
 			} else {
-				output = constructAcceptor<ExpVecArc>(latinIndices);
+				output = constructAcceptor<ExpVecArc>(sourceIndices);
 			}
 
 			VectorFst<ExpVecArc> lattice;
@@ -257,7 +257,7 @@ public:
 			mll += ll.Value();
 			final.Add(Divide(unnormCounts, ll));
 
-			if (((i+1) % batchSize == 0) || i+1 == latinIndicesVector.size()) {
+			if (((i+1) % batchSize == 0) || i+1 == sourceIndicesVector.size()) {
 				// Performing a stepwise EM update after each batch
 				final.Add(prior);
 				float logEta = -alpha * log(k + 2);
@@ -266,7 +266,7 @@ public:
 				mu = Plus(Times(LogWeight(logCoef), mu), Times(LogWeight(logEta), final.Sum()));
 				VecWeight emProbs;
 				if (freeze_at >= 0) {
-					emProbs = emExp.normalizeFrozen(mu, freeze_at, orig_epsilon, latin_epsilon);
+					emProbs = emExp.normalizeFrozen(mu, freeze_at, target_epsilon, source_epsilon);
 				} else {
 					emProbs = emExp.normalize(mu);
 				}
@@ -277,7 +277,7 @@ public:
 				float thr = 5 - 0.05 * k;
 				if (thr < minThr) thr = minThr;
 				for (int arcIdx = 0; arcIdx < emExp.arcIndexer.size(); arcIdx++) {
-					if (emExp.arcIndexer[arcIdx].first != orig_epsilon && emExp.arcIndexer[arcIdx].second != latin_epsilon) {
+					if (emExp.arcIndexer[arcIdx].first != target_epsilon && emExp.arcIndexer[arcIdx].second != source_epsilon) {
 						if (emProbs.Value(arcIdx) == LogWeight::Zero() || emProbs.Value(arcIdx).Value() > thr) {
 							emProbs.SetValue(arcIdx, LogWeight::Zero());
 							mu.SetValue(arcIdx, LogWeight::Zero());
@@ -289,13 +289,13 @@ public:
 
 				// Normalizing mu to get emission probabilities
 				if (freeze_at >= 0) {
-					emProbs = emExp.normalizeFrozen(mu, freeze_at, orig_epsilon, latin_epsilon);
+					emProbs = emExp.normalizeFrozen(mu, freeze_at, target_epsilon, source_epsilon);
 				} else {
 					emProbs = emExp.normalize(mu);
 				}
 
-				emExp = EmissionFst<ExpVecArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
-				emStd = EmissionFst<StdArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
+				emExp = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+				emStd = EmissionFst<StdArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
 				std::cout << "Log-likelihood of training mini-batch: " << mll << std::endl;
 
 				elapsed = (std::clock() - start) / (double) CLOCKS_PER_SEC;
@@ -303,13 +303,13 @@ public:
 				mll = 0;
 				numTokens = 0;
 
-				if ((i+1) % batchSize == 0 || i+1 == latinIndicesVector.size()) {
+				if ((i+1) % batchSize == 0 || i+1 == sourceIndicesVector.size()) {
 					// Evaluating on validation data after every batch
 					float devCer = test(devData, composeType, false, dev_prediction_file);
 					std::cout << "Validation data CER: " << devCer << std::endl;
 
 					// Evaluating on test data if the validation CER is less than the previous best value
-					if (testData.latinIndices.size() > 0 && devCer <= prevDevCer) {
+					if (testData.sourceIndices.size() > 0 && devCer <= prevDevCer) {
 						if (!no_save) {
 							std::cout << "Saving the trained emission model to: " << emission_outfile << std::endl;
 							emStd.Write(emission_outfile);
@@ -333,8 +333,8 @@ public:
 						std::cout << "Unfreezing insertions and deletions\n";
 						freeze_at = -1;
 						emProbs = emExp.normalize(mu);
-						emExp = EmissionFst<ExpVecArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
-						emStd = EmissionFst<StdArc>(max_delay, origAlphSize, latinAlphSize, emProbs);
+						emExp = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+						emStd = EmissionFst<StdArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
 					}
 					order += upgrade_lm_by;
 					if (order > 6) order = 6;
@@ -367,7 +367,7 @@ public:
 			}
 		}
 		mu = lp;
-		if (freeze_at >= 0) return emExp.normalizeFrozen(lp, freeze_at, orig_epsilon, latin_epsilon);
+		if (freeze_at >= 0) return emExp.normalizeFrozen(lp, freeze_at, target_epsilon, source_epsilon);
 		return emExp.normalize(lp);
 	}
 };
@@ -375,19 +375,19 @@ public:
 class Model : public Base {
 public:
 	Model(VectorFst<StdArc> lmFst, EmissionTropicalSemiring em) :
-		Base(em.fst.max_delay, em.origAlphSize, em.latinAlphSize) {
+		Base(em.fst.max_delay, em.targetAlphSize, em.sourceAlphSize) {
 
-		latin_epsilon = em.latinAlphSize + 1;
-		orig_epsilon = em.origAlphSize + 1;
+		source_epsilon = em.sourceAlphSize + 1;
+		target_epsilon = em.targetAlphSize + 1;
 
-		latinDelMask = em.getOIndices();
+		sourceDelMask = em.getOIndices();
 
 		this->lmStd = lmFst;
 		this->emStd = em.fst;
 	}
 
-	Model(VectorFst<StdArc> lmFst, EmissionFst<StdArc> emFst, int oa, int la) :
-		Base(emFst.max_delay, oa, la) {
+	Model(VectorFst<StdArc> lmFst, EmissionFst<StdArc> emFst, int trg_a, int src_a) :
+		Base(emFst.max_delay, trg_a, src_a) {
 
 		this->lmStd = lmFst;
 		this->emStd = emFst;
