@@ -268,7 +268,7 @@ int main(int argc, char* argv[]) {
 
 		std::cout << "\nTraining the emission model on validation data...\n";
 		EmissionTropicalSemiring tropicalEm = trainEmission(devData, max_delay, targetIndexer.getSize(),
-				sourceIndexer.getSize(), seed, output_dir, no_save);
+				sourceIndexer.getSize(), seed, output_dir, no_save, max_iter);
 		std::cout << "Done\n";
 
 		Model model(lmFst, tropicalEm);
