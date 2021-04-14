@@ -113,7 +113,7 @@ public:
 
 			if (verbose) {
 				std::cout << std::endl;
-				std::cout << "Source:      " <<
+				std::cout << "Source:     " <<
 						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
 			}
 

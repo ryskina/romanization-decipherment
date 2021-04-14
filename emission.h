@@ -53,21 +53,15 @@ public:
 		targetAlphSize = trg_a;
 		sourceAlphSize = src_a;
 		max_delay = md;
-		if (md == 0) {
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
-			Compose(epsFilterInput, fst, &fst);
-			Compose(fst, epsFilterOutput, &fst);
-		}
 	};
 
 	VecWeight train(std::vector<std::vector<int>> targetIndicesVector, std::vector<std::vector<int>> sourceIndicesVector,
-			bool verbose = false) {
+			bool verbose = false, int max_iter = 1) {
 		std::clock_t start;
 		double elapsed;
 		start = std::clock();
 
-		int max_iter = 5;
+		std::cout << "Supervised model will be trained for " << max_iter << " iteration(s)" << std::endl;
 		VecWeight emProbs;
 		float mll = 0;
 		float prevMll = INFINITY;
@@ -200,10 +194,10 @@ public:
 
 // Training the emission WFST on supervised data
 EmissionTropicalSemiring trainEmission(IndexedStrings data, int max_delay, int targetAlphSize, int sourceAlphSize,
-		int seed, std::string output_dir, bool no_save = false) {
+		int seed, std::string output_dir, bool no_save = false, int max_iter = 1) {
 
 	EmissionLogExpSemiring logExpEm(max_delay, targetAlphSize, sourceAlphSize, seed);
-	VecWeight emProbs = logExpEm.train(data.targetIndices, data.sourceIndices, true);
+	VecWeight emProbs = logExpEm.train(data.targetIndices, data.sourceIndices, true, max_iter);
 
 	std::cout << "Emission model (expectation semiring): " << logExpEm.fst.NumStates() << " states, "
 			<< logExpEm.fst.getNumArcs() << " arcs\n";

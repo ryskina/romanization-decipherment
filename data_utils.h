@@ -39,13 +39,10 @@ public:
 
 	/*
 	 * This implementation makes the following assumptions about indexing:
-	 *    * symbols indexed 1 through 29 are punctuation marks that can only be
-	 *          inserted, deleted or substituted with their equivalent
-	 *    * symbols indexed 30 through alphabetSize are the remaining characters
+	 *    * space symbol is indexed 1, and it can only be
+	 *          inserted, deleted or substituted itself
 	 *    * symbol indexed alphabetSize + 1 corresponds to an epsilon-transition
 	 *          (insertion for source, deletion for target)
-	 *
-	 *     TODO: remove punctuation assumptions
 	 *
 	 * Index 0 is reserved in OpenFST for epsilon and is not used in this implementation.
 	 * We replace it with separate insertion and deletion symbols described above to avoid composition issues
@@ -73,22 +70,6 @@ public:
 		} else {
 			std::cout << "Unable to open symbol table file: " << symbol_table_path << std::endl;
 			exit(-1);
-		}
-	}
-
-	// Initializing symbol indexer with punctuation
-	Indexer(bool arabic = false) {
-		if (!arabic) {
-			index(" :_()[|]-\"!.*=@/+&$~–—^");
-			index(";?,<>%");
-		} else {
-			// For Arabic, some punctuation marks are substituted with special equivalents
-			index(" :_()[|]-\"!.*=@/+&$~–—^");
-			index("؛");
-			index("؟");
-			index("٬");
-			index("><");
-			index("٪");
 		}
 	}
 

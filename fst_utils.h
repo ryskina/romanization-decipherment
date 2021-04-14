@@ -15,7 +15,6 @@
 using namespace fst;
 
 const int NUM_EPS_TOTAL = 10; // total number of epsilons to use if delay is not restricted
-const int TO_RESTRICT = 29;   // the number of punctuation symbols to exclude from substitutions
 
 template <class A, int n>
 class EpsilonTotalFilter : public VectorFst<A> {

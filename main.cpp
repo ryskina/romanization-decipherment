@@ -30,6 +30,8 @@ int batch_size = 10;
 int upgrade_lm_every = 100;
 int upgrade_lm_by = 1;
 int max_delay = 0;
+int max_iter = 1;
+int lm_order = 6;
 float freeze_at = -1; // no freezing
 
 std::string dataset;
@@ -53,7 +55,9 @@ void PrintHelp() {
         "  ./decipher --dataset {ru|ar|...} --supervised [--seed S] [--batch-size B] [--no-test] [--no-save]\n\n"
     	"OPTIONS:\n"
 		"--dataset {ru|ar|...}:                Dataset (mandatory parameter)\n"
-    	"--max-delay M                         Maximum delay of FST path (default ru=2, ar=5)\n"
+    	"--max-delay M:                        Maximum delay of FST path (default ru=2, ar=5)\n"
+        "--max-iter I:                         Number of training iterations (default 5)\n"
+        "--lm-order L:                         Maximum LM order (default 6)\n"
 		"--seed S:                             Set random seed to S (int; default 0)\n"
 		"--batch-size B:                       Mini-batch size for stepwise EM training "
 		                                       "(unsupervised only; int; default 10)\n"
@@ -79,6 +83,8 @@ void ProcessArgs(int argc, char* argv[]) {
     const option long_opts[] = {
 		{"dataset", required_argument, nullptr, 'd'},
 		{"max-delay", required_argument, nullptr, 'm'},
+		{"max-iter", required_argument, nullptr, 'i'},
+		{"lm-order", required_argument, nullptr, 'l'},
 		{"seed", required_argument, nullptr, 'n'},
 		{"batch-size", required_argument, nullptr, 'b'},
 		{"upgrade-lm-every", required_argument, nullptr, 'e'},
@@ -108,6 +114,14 @@ void ProcessArgs(int argc, char* argv[]) {
 
         case 'm':
             max_delay = std::stoi(optarg);
+            break;
+
+        case 'i':
+            max_iter = std::stoi(optarg);
+            break;
+
+        case 'l':
+            lm_order = std::stoi(optarg);
             break;
 
         case 'n':
@@ -171,8 +185,11 @@ void ProcessArgs(int argc, char* argv[]) {
     		if (dataset == "ar") max_delay = 5;
     		if (dataset == "ru") max_delay = 2;
     	}
-    	// TODO: configure max_delay = 0 to mean unrestricted delay
-    	std::cout << "Maximum emission model delay: " << max_delay << std::endl;
+    	if (max_delay == 0) {
+        	std::cout << "WARNING: unrestricted delay!" << std::endl;
+    	} else {
+    		std::cout << "Maximum emission model delay: " << max_delay << std::endl;
+    	}
     }
 
     if (run_supervised) {
@@ -245,8 +262,8 @@ int main(int argc, char* argv[]) {
 	if (!targetIndexer.locked) targetIndexer.lock();
 
 	if (run_supervised) {
-		std::cout << "\nTraining the language model of the target side...\n";
-		VectorFst<StdArc> lmFst = trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), 6, output_dir, no_save);
+		std::cout << "\nTraining the " << lm_order << "-gram language model of the target side...\n";
+		VectorFst<StdArc> lmFst = trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), lm_order, output_dir, no_save);
 		std::cout << "Done\n";
 
 		std::cout << "\nTraining the emission model on validation data...\n";
@@ -285,7 +302,7 @@ int main(int argc, char* argv[]) {
 		std::vector<VectorFst<StdArc>> lmFstArray;
 		// While insertion/deletion probabilities are kept frozen,
 		// the language model disallows epsilons (insertions) to keep the model locally normalized
-		for (int order = 2; order <= 6; order++) lmFstArray.push_back(
+		for (int order = 2; order <= lm_order; order++) lmFstArray.push_back(
 				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), order, output_dir, no_save,
 						no_epsilons || (freeze_at >= 0 && order == 2)));
 

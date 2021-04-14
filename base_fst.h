@@ -208,8 +208,8 @@ public:
 
 protected:
 	void addEmissionArc(int ilabel, int olabel) {
-		// Restricted symbols (punctuation) can only be substituted with their equivalents
-		if (ilabel != olabel && (ilabel <= TO_RESTRICT || olabel <= TO_RESTRICT)) return;
+		// Space can only be substituted with space
+		if (ilabel != olabel && (ilabel <= 1 || olabel <= 1)) return;
 		// Creating the corresponding emission arc for each state simultaneously
 		this->arcIndexer.push_back({ilabel, olabel});
 		int arcIndex = this->arcIndexer.size() - 1;
