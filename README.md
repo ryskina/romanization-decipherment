@@ -1,4 +1,4 @@
-This repository contains the code for the [paper](https://arxiv.org/pdf/2005.02517.pdf):
+This repository contains the code for the [paper](https://www.aclweb.org/anthology/2020.acl-main.737/):
 
 ```
 Phonetic and Visual Priors for Decipherment of Informal Romanization
