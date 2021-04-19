@@ -383,6 +383,12 @@ public:
 
 			// Decoding source string into the most likely one
 			std::vector<int> targetIndices = decode(sourceIndices, composeType, false);
+			if (verbose) {
+				std::cout << "Source:     " <<
+						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
+				std::cout << "Prediction: " << testData.targetIndexerPtr->encode(targetIndices) << std::endl;
+				std::cout << std::endl;
+			}
 
 			// Using predicted target decoding to compute expected counts
 			VectorFst<ExpVecArc> input;
@@ -473,7 +479,7 @@ public:
 				mll = 0;
 				numTokens = 0;
 
-				if ((i+1) % (50 * batchSize) == 0 || i+1 == sourceIndicesVector.size()) {
+				if (i+1 == sourceIndicesVector.size()) {
 					// Evaluating on validation data after every batch
 					float devCer = test(devData, composeType, false, dev_prediction_file);
 					std::cout << "Validation data CER: " << devCer << std::endl;
