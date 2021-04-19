@@ -37,6 +37,7 @@ float freeze_at = -1; // no freezing
 std::string dataset;
 std::string prior = "uniform";
 bool run_supervised = false;
+bool run_hard_em = false;
 bool no_epsilons = false;
 bool no_test = false;
 bool no_save = false;
@@ -71,6 +72,7 @@ void PrintHelp() {
 		                                       "for the first E batches (unsupervised only; float; "
 		                                       "no freezing by default)\n"
 		"--supervised:                         Train a supervised model on validation data\n"
+    	"--hard-em:                            Train an unsupervised model with hard EM\n"
 		"--no-epsilons:                        Turn off insertions and deletions (unsupervised only)\n"
 		"--no-test:                            Turn off testing\n"
 		"--no-save:                            Turn off model saving\n"
@@ -92,6 +94,7 @@ void ProcessArgs(int argc, char* argv[]) {
 		{"prior", required_argument, nullptr, 'p'},
 		{"freeze-at", required_argument, nullptr, 'f'},
 		{"supervised", no_argument, nullptr, 's'},
+		{"hard-em", no_argument, nullptr, 'g'},
 		{"no-epsilons", no_argument, nullptr, 'r'},
 		{"no-test", no_argument, nullptr, 't'},
 		{"no-save", no_argument, nullptr, 'v'},
@@ -157,6 +160,10 @@ void ProcessArgs(int argc, char* argv[]) {
             run_supervised = true;
             break;
 
+        case 'g':
+            run_hard_em = true;
+            break;
+
         case 'r':
             no_epsilons = true;
             break;
@@ -197,8 +204,10 @@ void ProcessArgs(int argc, char* argv[]) {
     } else {
     	std::cout << "Training an unsupervised model with " << prior << " prior\n";
     	std::cout << "Mini-batch size: " << batch_size << std::endl;
-    	std::cout << "Language model order will be increased every " << upgrade_lm_every << " batches\n";
-    	std::cout << "Language model order will be increased by " << upgrade_lm_by << " each time\n";
+    	if (!run_hard_em) {
+			std::cout << "Language model order will be increased every " << upgrade_lm_every << " batches\n";
+			std::cout << "Language model order will be increased by " << upgrade_lm_by << " each time\n";
+    	}
     	if (freeze_at > 0) {
         	std::cout << "Insertion and deletion probabilities frozen at " << exp(-freeze_at) <<
         			" (" <<  freeze_at << " in negative log space) for the first " <<
@@ -218,6 +227,14 @@ int main(int argc, char* argv[]) {
 	std::string output_dir = "./output/" + dataset;
 	if (run_supervised) {
 		output_dir = output_dir + "_sup_seed-" + std::to_string(seed);
+	} else if (run_hard_em) {
+		output_dir = output_dir + "_hard_uns_" + prior + "_seed-" + std::to_string(seed);
+		if (no_epsilons) {
+			output_dir += "_no-epsilons";
+		}
+		if (freeze_at >= 0) {
+			output_dir += "_freeze-" + std::to_string(freeze_at);
+		}
 	} else {
 		output_dir = output_dir + "_uns_" + prior + "_seed-" + std::to_string(seed) +
 				"_upgrade-lm-every-" + std::to_string(upgrade_lm_every) +
@@ -293,12 +310,36 @@ int main(int argc, char* argv[]) {
 					&sourceIndexer, model.emStd.target_epsilon, model.emStd.source_epsilon);
 		}
 
+	} else if (run_hard_em) {
+		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
+		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
+				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
+
+		std::cout << "\nTraining the " << lm_order << "-gram language model of the target orthography...\n";
+		std::vector<VectorFst<StdArc>> lmFstArray;
+		// While insertion/deletion probabilities are kept frozen,
+		// the language model disallows epsilons (insertions) to keep the model locally normalized
+		lmFstArray.push_back(
+				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), lm_order, output_dir, no_save,
+						no_epsilons || (freeze_at >= 0 && lm_order == 2)));
+
+		std::vector<std::pair<int, int>> priorMappings;
+		if (prior != "uniform") {
+			std::string priorFname = data_dir + "/prior_" + prior + ".txt";
+			priorMappings = DataUtils::readPrior(priorFname, &sourceIndexer, &targetIndexer);
+			std::cout << "Initializing with the " << prior << " prior\n";
+		}
+
+		Trainer trainer(lmFstArray, max_delay, &targetIndexer, &sourceIndexer, seed, priorMappings,
+				no_epsilons, freeze_at);
+		trainer.trainHardEM(monolingualTrain, devData, testData, output_dir, batch_size, PHI_MATCH, true, no_save);
+
 	} else {
  		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
 
-		std::cout << "\nTraining the language models of the original orthography...\n";
+		std::cout << "\nTraining the language models of the target orthography...\n";
 		std::vector<VectorFst<StdArc>> lmFstArray;
 		// While insertion/deletion probabilities are kept frozen,
 		// the language model disallows epsilons (insertions) to keep the model locally normalized

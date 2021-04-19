@@ -353,6 +353,158 @@ public:
 		}
 	}
 
+	void trainHardEM(std::vector<std::vector<int>> sourceIndicesVector, IndexedStrings devData, IndexedStrings testData,
+			std::string output_dir, int batchSize,
+			LmComposeType composeType = PHI_MATCH, bool verbose=false, bool no_save=false) {
+
+		if (batchSize > sourceIndicesVector.size()) batchSize = sourceIndicesVector.size();
+
+//		int order = 2;
+		int k = 0;
+		float prevDevCer = 100;
+
+		std::string emission_outfile = output_dir + "/emission.fst";
+		std::string model_outfile = output_dir + "/model.fst";
+		std::string test_prediction_file = output_dir + "/test_prediction.txt";
+		std::string dev_prediction_file = output_dir + "/dev_prediction.txt";
+
+		float numTokens = 0;
+		float mll = 0;
+
+		std::clock_t start;
+		double elapsed;
+		start = std::clock();
+
+		Adder<VecWeight> final;
+
+		for (int i = 0; i < sourceIndicesVector.size(); i++) {
+			std::vector<int> sourceIndices = sourceIndicesVector[i];
+			numTokens += sourceIndices.size();
+
+			// Decoding source string into the most likely one
+			std::vector<int> targetIndices = decode(sourceIndices, composeType, false);
+
+			// Using predicted target decoding to compute expected counts
+			VectorFst<ExpVecArc> input;
+			VectorFst<ExpVecArc> output;
+			if (!no_epsilons) {
+				input = constructInput<ExpVecArc>(targetIndices, target_epsilon);
+				output = constructOutput<ExpVecArc>(sourceIndices, source_epsilon);
+			} else {
+				input = constructAcceptor<ExpVecArc>(targetIndices);
+				output = constructAcceptor<ExpVecArc>(sourceIndices);
+			}
+
+			VectorFst<ExpVecArc> lattice;
+			Compose<ExpVecArc>(emExp, output, &lattice);
+			if (!composeCheck(&lattice, "emission")) continue;
+
+			if (composeType == PHI_MATCH) {
+				lmPhiCompose<ExpVecArc>(lmExp, lattice, &lattice);
+			} else {
+				Compose<ExpVecArc>(lmExp, lattice, &lattice);
+				RmEpsilon(&lattice);
+			}
+			if (!composeCheck(&lattice, "lm rescore")) continue;
+			Compose<ExpVecArc>(input, lattice, &lattice);
+
+			if (!composeCheck(&lattice, "hard EM input composition")) continue;
+
+			if (verbose) printStats(&lattice, "Lattice: ");
+
+			VecWeight unnormCounts;
+			LogWeight ll;
+
+			std::vector<ExpVecWeight> dist;
+			ShortestDistance(lattice, &dist, true);
+			if (dist.size() == 0) {
+				if (verbose) std::cout << "FAILED TO COMPUTE COUNTS" << std::endl;
+				continue;
+			}
+			// Collecting expected counts in the expectation semiring
+			unnormCounts = dist[0].Value2();
+			ll = dist[0].Value1();
+			mll += ll.Value();
+			final.Add(Divide(unnormCounts, ll));
+
+			if (((i+1) % batchSize == 0) || i+1 == sourceIndicesVector.size()) {
+				// Performing a stepwise EM update after each batch
+				final.Add(prior);
+				float logEta = -alpha * log(k + 2);
+				float logCoef = log(1 - exp(logEta));
+				k++;
+				mu = Plus(Times(LogWeight(logCoef), mu), Times(LogWeight(logEta), final.Sum()));
+				VecWeight emProbs;
+				if (freeze_at >= 0) {
+					emProbs = emExp.normalizeFrozen(mu, freeze_at, target_epsilon, source_epsilon);
+				} else {
+					emProbs = emExp.normalize(mu);
+				}
+
+				// Pruning the low-probability emission arcs
+				int pruned = 0;
+				float minThr = 4.5;
+				float thr = 5 - 0.05 * k;
+				if (thr < minThr) thr = minThr;
+				for (int arcIdx = 0; arcIdx < emExp.arcIndexer.size(); arcIdx++) {
+					if (emExp.arcIndexer[arcIdx].first != target_epsilon && emExp.arcIndexer[arcIdx].second != source_epsilon) {
+						if (emProbs.Value(arcIdx) == LogWeight::Zero() || emProbs.Value(arcIdx).Value() > thr) {
+							emProbs.SetValue(arcIdx, LogWeight::Zero());
+							mu.SetValue(arcIdx, LogWeight::Zero());
+							pruned++;
+						}
+					}
+				}
+				std::cout << "Pruned " << pruned << " arcs out of " << emExp.arcIndexer.size() << "; thr = " << thr << std::endl;
+
+				// Normalizing mu to get emission probabilities
+				if (freeze_at >= 0) {
+					emProbs = emExp.normalizeFrozen(mu, freeze_at, target_epsilon, source_epsilon);
+				} else {
+					emProbs = emExp.normalize(mu);
+				}
+
+				emExp = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+				emStd = EmissionFst<StdArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+				std::cout << "Log-likelihood of training mini-batch: " << mll << std::endl;
+
+				elapsed = (std::clock() - start) / (double) CLOCKS_PER_SEC;
+				if (verbose) std::cout << "String pairs processed: " << i + 1  << "; time elapsed: " << elapsed << std::endl;
+				mll = 0;
+				numTokens = 0;
+
+				if ((i+1) % (10 * batchSize) == 0 || i+1 == sourceIndicesVector.size()) {
+					// Evaluating on validation data after every batch
+					float devCer = test(devData, composeType, false, dev_prediction_file);
+					std::cout << "Validation data CER: " << devCer << std::endl;
+
+					// Evaluating on test data if the validation CER is less than the previous best value
+					if (testData.sourceIndices.size() > 0 && devCer <= prevDevCer) {
+						if (!no_save) {
+							std::cout << "Saving the trained emission model to: " << emission_outfile << std::endl;
+							emStd.Write(emission_outfile);
+							std::cout << "Composing and saving the base lattice to: " << model_outfile << std::endl;
+							VectorFst<StdArc> allStatesLattice;
+							lmPhiCompose<StdArc>(lmStd, emStd, &allStatesLattice);
+							allStatesLattice.Write(model_outfile);
+						}
+//						std::cout << "Evaluating on test data\n";
+//						float testCer = test(testData, composeType, false, test_prediction_file);
+//						std::cout << "Test data CER: " << testCer << std::endl;
+//						prevDevCer = devCer;
+					}
+				}
+
+			}
+		}
+
+		if (verbose) {
+			elapsed = (std::clock() - start) / (double) CLOCKS_PER_SEC;
+			std::cout<<"Time elapsed: "<< elapsed << "; tokens per second: "<< numTokens / elapsed << std::endl;
+		}
+	}
+
+
 	VecWeight addNoise(int numArcs, VecWeight lp, int seed) {
 		srand(seed);
 		double delta = 1e-2;
