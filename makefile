@@ -11,8 +11,9 @@ main.o : main.cpp
 	g++ -O3 -c -I/usr/local/include/ -fmessage-length=0 -std=c++11 -MMD -MP -MF"main.d" -MT"main.d" -o "main.o" "main.cpp"
 	@echo 'Finished building: main.cpp'
 	@echo ' '
-
-all : decipher
+	
+all : clean decipher
 
 clean :
-	rm "main.d" "main.o"
+	 [ ! -e "main.d" ] || rm "main.d"
+	 [ ! -e "main.o" ] || rm "main.o"
