@@ -473,7 +473,7 @@ public:
 				mll = 0;
 				numTokens = 0;
 
-				if ((i+1) % (10 * batchSize) == 0 || i+1 == sourceIndicesVector.size()) {
+				if ((i+1) % (50 * batchSize) == 0 || i+1 == sourceIndicesVector.size()) {
 					// Evaluating on validation data after every batch
 					float devCer = test(devData, composeType, false, dev_prediction_file);
 					std::cout << "Validation data CER: " << devCer << std::endl;
