@@ -10,3 +10,5 @@ Release/*
 *.d
 *.o
 decipher
+
+makefile
