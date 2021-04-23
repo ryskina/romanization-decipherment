@@ -31,6 +31,7 @@ int upgrade_lm_every = 100;
 int upgrade_lm_by = 1;
 int max_delay = 0;
 int max_iter = 1;
+int max_train = -1;
 int lm_order = 6;
 float freeze_at = -1; // no freezing
 
@@ -57,7 +58,8 @@ void PrintHelp() {
     	"OPTIONS:\n"
 		"--dataset {ru|ar|...}:                Dataset (mandatory parameter)\n"
     	"--max-delay M:                        Maximum delay of FST path (default ru=2, ar=5)\n"
-        "--max-iter I:                         Number of training iterations (default 5)\n"
+        "--max-iter I:                         Number of training iterations (default 1)\n"
+        "--max-train Q:                        Number of training samples to use (unsupervised only; default all)\n"
         "--lm-order L:                         Maximum LM order (default 6)\n"
 		"--seed S:                             Set random seed to S (int; default 0)\n"
 		"--batch-size B:                       Mini-batch size for stepwise EM training "
@@ -86,6 +88,7 @@ void ProcessArgs(int argc, char* argv[]) {
 		{"dataset", required_argument, nullptr, 'd'},
 		{"max-delay", required_argument, nullptr, 'm'},
 		{"max-iter", required_argument, nullptr, 'i'},
+		{"max-train", required_argument, nullptr, 'q'},
 		{"lm-order", required_argument, nullptr, 'l'},
 		{"seed", required_argument, nullptr, 'n'},
 		{"batch-size", required_argument, nullptr, 'b'},
@@ -121,6 +124,10 @@ void ProcessArgs(int argc, char* argv[]) {
 
         case 'i':
             max_iter = std::stoi(optarg);
+            break;
+
+        case 'q':
+            max_train = std::stoi(optarg);
             break;
 
         case 'l':
@@ -226,26 +233,31 @@ int main(int argc, char* argv[]) {
 	mkdir("./output/", 0777);
 	std::string output_dir = "./output/" + dataset;
 	if (run_supervised) {
-		output_dir = output_dir + "_sup_seed-" + std::to_string(seed);
-	} else if (run_hard_em) {
-		output_dir = output_dir + "_hard_uns_" + prior + "_seed-" + std::to_string(seed);
-		if (no_epsilons) {
-			output_dir += "_no-epsilons";
-		}
-		if (freeze_at >= 0) {
-			output_dir += "_freeze-" + std::to_string(freeze_at);
-		}
+		output_dir = output_dir + "_sup_seed-" + std::to_string(seed) +
+				"_lm-order-" + std::to_string(lm_order) + "_max-delay-" + std::to_string(max_delay);
 	} else {
-		output_dir = output_dir + "_uns_" + prior + "_seed-" + std::to_string(seed) +
-				"_upgrade-lm-every-" + std::to_string(upgrade_lm_every) +
-				"-by-" + std::to_string(upgrade_lm_by);
+		if (run_hard_em) {
+			output_dir = output_dir + "_hard_uns_" + prior + "_seed-" + std::to_string(seed) +
+					"_lm-order-" + std::to_string(lm_order);
+		} else {
+			output_dir = output_dir + "_uns_" + prior + "_seed-" + std::to_string(seed) +
+					"_upgrade-lm-every-" + std::to_string(upgrade_lm_every) +
+					"-by-" + std::to_string(upgrade_lm_by);
+		}
+		output_dir += "_max-delay-" + std::to_string(max_delay);
 		if (no_epsilons) {
 			output_dir += "_no-epsilons";
 		}
 		if (freeze_at >= 0) {
 			output_dir += "_freeze-" + std::to_string(freeze_at);
 		}
+		if (max_train > 0) {
+			output_dir += "_max_train-" + std::to_string(max_train);
+
+		}
+
 	}
+
 	mkdir(output_dir.c_str(), 0777);
 	std::cout << "Saving models and output files to " << output_dir << std::endl;
 
@@ -314,6 +326,10 @@ int main(int argc, char* argv[]) {
 		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
+		if (max_train > 0) {
+			monolingualTrain = std::vector<std::vector<int>>(monolingualTrain.begin(),
+															 monolingualTrain.begin() + max_train);
+		}
 
 		std::cout << "\nTraining the " << lm_order << "-gram language model of the target orthography...\n";
 		std::vector<VectorFst<StdArc>> lmFstArray;
@@ -338,6 +354,10 @@ int main(int argc, char* argv[]) {
  		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
+		if (max_train > 0) {
+			monolingualTrain = std::vector<std::vector<int>>(monolingualTrain.begin(),
+															 monolingualTrain.begin() + max_train);
+		}
 
 		std::cout << "\nTraining the language models of the target orthography...\n";
 		std::vector<VectorFst<StdArc>> lmFstArray;

@@ -35,12 +35,12 @@ public:
 		targetAlphSize = trg_a;
 		sourceAlphSize = src_a;
 		max_delay = md;
-		if (md == 0) {
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
-			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
-			Compose(epsFilterInput, fst, &fst);
-			Compose(fst, epsFilterOutput, &fst);
-		}
+//		if (md == 0) {
+//			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
+//			EpsilonTotalFilter<ExpVecArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
+//			Compose(epsFilterInput, fst, &fst);
+//			Compose(fst, epsFilterOutput, &fst);
+//		}
 
 		VecWeight initLp = addNoise(fst.arcIndexer.size(), fst.getLogProbs(), seed);
 		fst = EmissionFst<ExpVecArc>(md, trg_a, src_a, initLp);
@@ -173,12 +173,12 @@ public:
 		targetAlphSize = trg_a;
 		sourceAlphSize = la;
 		max_delay = md;
-		if (md == 0) {
-			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
-			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
-			Compose(epsFilterInput, fst, &fst);
-			Compose(fst, epsFilterOutput, &fst);
-		}
+//		if (md == 0) {
+//			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterInput(targetAlphSize, fst.target_epsilon);
+//			EpsilonTotalFilter<StdArc, NUM_EPS_TOTAL> epsFilterOutput(sourceAlphSize, fst.source_epsilon);
+//			Compose(epsFilterInput, fst, &fst);
+//			Compose(fst, epsFilterOutput, &fst);
+//		}
 	}
 
 	// Collecting a set of all allowed emission labels
