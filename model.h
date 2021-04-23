@@ -90,7 +90,6 @@ public:
 			for (ArcIterator<VectorFst<StdArc>> aiter(path, curState); !aiter.Done(); aiter.Next()) {
 				const StdArc &arc = aiter.Value();
 				curState = arc.nextstate;
-				std::cout << arc.ilabel << " " << arc.olabel << "\n";
 				if (arc.ilabel != 0 && arc.ilabel != target_epsilon) out.push_back(arc.ilabel);
 			}
 		}
