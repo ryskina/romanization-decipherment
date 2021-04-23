@@ -90,6 +90,7 @@ public:
 			for (ArcIterator<VectorFst<StdArc>> aiter(path, curState); !aiter.Done(); aiter.Next()) {
 				const StdArc &arc = aiter.Value();
 				curState = arc.nextstate;
+				std::cout << arc.ilabel << " " << arc.olabel << "\n";
 				if (arc.ilabel != 0 && arc.ilabel != target_epsilon) out.push_back(arc.ilabel);
 			}
 		}
@@ -480,25 +481,19 @@ public:
 				numTokens = 0;
 
 				if (i+1 == sourceIndicesVector.size()) {
+					if (!no_save) {
+						std::cout << "Saving the trained emission model to: " << emission_outfile << std::endl;
+						emStd.Write(emission_outfile);
+						std::cout << "Composing and saving the base lattice to: " << model_outfile << std::endl;
+						VectorFst<StdArc> allStatesLattice;
+						lmPhiCompose<StdArc>(lmStd, emStd, &allStatesLattice);
+						allStatesLattice.Write(model_outfile);
+					}
+
 					// Evaluating on validation data after every batch
-					float devCer = test(devData, composeType, false, dev_prediction_file);
+					float devCer = test(devData, composeType, true, dev_prediction_file);
 					std::cout << "Validation data CER: " << devCer << std::endl;
 
-					// Evaluating on test data if the validation CER is less than the previous best value
-					if (testData.sourceIndices.size() > 0 && devCer <= prevDevCer) {
-						if (!no_save) {
-							std::cout << "Saving the trained emission model to: " << emission_outfile << std::endl;
-							emStd.Write(emission_outfile);
-							std::cout << "Composing and saving the base lattice to: " << model_outfile << std::endl;
-							VectorFst<StdArc> allStatesLattice;
-							lmPhiCompose<StdArc>(lmStd, emStd, &allStatesLattice);
-							allStatesLattice.Write(model_outfile);
-						}
-//						std::cout << "Evaluating on test data\n";
-//						float testCer = test(testData, composeType, false, test_prediction_file);
-//						std::cout << "Test data CER: " << testCer << std::endl;
-//						prevDevCer = devCer;
-					}
 				}
 
 			}
