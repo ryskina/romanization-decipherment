@@ -234,7 +234,9 @@ int main(int argc, char* argv[]) {
 	std::string output_dir = "./output/" + dataset;
 	if (run_supervised) {
 		output_dir = output_dir + "_sup_seed-" + std::to_string(seed) +
-				"_lm-order-" + std::to_string(lm_order) + "_max-delay-" + std::to_string(max_delay);
+				"_lm-order-" + std::to_string(lm_order) +
+				"_max-delay-" + std::to_string(max_delay) +
+				"_max-iter-" + std::to_string(max_iter);
 	} else {
 		if (run_hard_em) {
 			output_dir = output_dir + "_hard_uns_" + prior + "_seed-" + std::to_string(seed) +
@@ -245,6 +247,7 @@ int main(int argc, char* argv[]) {
 					"-by-" + std::to_string(upgrade_lm_by);
 		}
 		output_dir += "_max-delay-" + std::to_string(max_delay);
+		output_dir += "_max-iter-" + std::to_string(max_iter);
 		if (no_epsilons) {
 			output_dir += "_no-epsilons";
 		}
