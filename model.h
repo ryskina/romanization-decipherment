@@ -354,12 +354,12 @@ public:
 	}
 
 	void trainHardEM(std::vector<std::vector<int>> sourceIndicesVector, IndexedStrings devData, IndexedStrings testData,
-			std::string output_dir, int batchSize,
+			std::string output_dir, int batchSize, int upgrade_lm_every, int upgrade_lm_by,
 			LmComposeType composeType = PHI_MATCH, bool verbose=false, bool no_save=false) {
 
 		if (batchSize > sourceIndicesVector.size()) batchSize = sourceIndicesVector.size();
 
-//		int order = 2;
+		int order = 2;
 		int k = 0;
 		float prevDevCer = 100;
 
@@ -495,7 +495,28 @@ public:
 
 				}
 
+				// Increasing the language model order
+				if ((i+1) % (upgrade_lm_every * batchSize) == 0) {
+					int current_order = order;
+					// If insertion/deletion probabilities are frozen, we unfreeze them when increasing LM order
+					if (current_order == 2 && freeze_at >= 0) {
+						std::cout << "Unfreezing insertions and deletions\n";
+						freeze_at = -1;
+						emProbs = emExp.normalize(mu);
+						emExp = EmissionFst<ExpVecArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+						emStd = EmissionFst<StdArc>(max_delay, targetAlphSize, sourceAlphSize, emProbs);
+					}
+					order += upgrade_lm_by;
+					if (order >= lmStdArray.size() + 2) order = lmStdArray.size() + 1;
+					if (order > current_order) {
+						std::cout << "Increasing LM order to " << order << std::endl;
+						lmStd = lmStdArray[order - 2];
+						Map(lmStd, &lmExp, WeightConvertMapper<StdArc, ExpVecArc>());
+					}
+				}
+
 			}
+
 		}
 
 		if (verbose) {

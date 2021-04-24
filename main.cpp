@@ -27,7 +27,7 @@ using namespace fst;
 // Default hyperparameter settings
 int seed = 0;
 int batch_size = 10;
-int upgrade_lm_every = 100;
+int upgrade_lm_every = -1;
 int upgrade_lm_by = 1;
 int max_delay = 0;
 int max_iter = 1;
@@ -195,10 +195,10 @@ void ProcessArgs(int argc, char* argv[]) {
     	std::cout << "Error: No dataset specified\n";
     	PrintHelp();
     } else {
-    	if (max_delay == 0) {
-    		if (dataset == "ar") max_delay = 5;
-    		if (dataset == "ru") max_delay = 2;
-    	}
+//    	if (max_delay == 0) {
+//    		if (dataset == "ar") max_delay = 5;
+//    		if (dataset == "ru") max_delay = 2;
+//    	}
     	if (max_delay == 0) {
         	std::cout << "WARNING: unrestricted delay!" << std::endl;
     	} else {
@@ -239,13 +239,17 @@ int main(int argc, char* argv[]) {
 				"_max-iter-" + std::to_string(max_iter);
 	} else {
 		if (run_hard_em) {
-			output_dir = output_dir + "_hard_uns_" + prior + "_seed-" + std::to_string(seed) +
-					"_lm-order-" + std::to_string(lm_order);
+			output_dir = output_dir + "_hard_uns_";
 		} else {
-			output_dir = output_dir + "_uns_" + prior + "_seed-" + std::to_string(seed) +
-					"_upgrade-lm-every-" + std::to_string(upgrade_lm_every) +
+			output_dir = output_dir + "_uns_";
+		}
+		output_dir += prior + "_seed-" + std::to_string(seed);
+		if (upgrade_lm_every > 0) {
+			output_dir += "_upgrade-lm-every-" + std::to_string(upgrade_lm_every) +
 					"-by-" + std::to_string(upgrade_lm_by);
 		}
+		output_dir += "_lm-order-" + std::to_string(lm_order);
+
 		output_dir += "_max-delay-" + std::to_string(max_delay);
 		output_dir += "_max-iter-" + std::to_string(max_iter);
 		if (no_epsilons) {
@@ -263,6 +267,9 @@ int main(int argc, char* argv[]) {
 
 	mkdir(output_dir.c_str(), 0777);
 	std::cout << "Saving models and output files to " << output_dir << std::endl;
+
+	// TODO: remove this hack for default values
+	if (upgrade_lm_every == -1) upgrade_lm_every = 100;
 
 	/*
 	 * For romanization decipherment, source is Romanized and target is original script
@@ -330,17 +337,24 @@ int main(int argc, char* argv[]) {
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
 		if (max_train > 0) {
+			std::cout << "Training on the " << max_train << " shortest sentences...\n";
 			monolingualTrain = std::vector<std::vector<int>>(monolingualTrain.begin(),
 															 monolingualTrain.begin() + max_train);
 		}
 
-		std::cout << "\nTraining the " << lm_order << "-gram language model of the target orthography...\n";
+		std::cout << "\nTraining the language models of the target orthography...\n";
+
+
+//		std::cout << "\nTraining the " << lm_order << "-gram language model of the target orthography...\n";
 		std::vector<VectorFst<StdArc>> lmFstArray;
 		// While insertion/deletion probabilities are kept frozen,
 		// the language model disallows epsilons (insertions) to keep the model locally normalized
-		lmFstArray.push_back(
-				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), lm_order, output_dir, no_save,
-						no_epsilons || (freeze_at >= 0 && lm_order == 2)));
+//		lmFstArray.push_back(
+//				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), lm_order, output_dir, no_save,
+//						no_epsilons || (freeze_at >= 0 && lm_order == 2)));
+		for (int order = 2; order <= lm_order; order++) lmFstArray.push_back(
+				trainLmOpenGRM(lmTrainData, targetIndexer.getSize(), order, output_dir, no_save,
+						no_epsilons || (freeze_at >= 0 && order == 2)));
 
 		std::vector<std::pair<int, int>> priorMappings;
 		if (prior != "uniform") {
@@ -351,13 +365,15 @@ int main(int argc, char* argv[]) {
 
 		Trainer trainer(lmFstArray, max_delay, &targetIndexer, &sourceIndexer, seed, priorMappings,
 				no_epsilons, freeze_at);
-		trainer.trainHardEM(monolingualTrain, devData, testData, output_dir, batch_size, PHI_MATCH, true, no_save);
+		trainer.trainHardEM(monolingualTrain, devData, testData, output_dir, batch_size, upgrade_lm_every, upgrade_lm_by,
+				PHI_MATCH, true, no_save);
 
 	} else {
  		std::vector<std::vector<int>> monolingualTrain = trainData.sourceIndices;
 		std::sort(monolingualTrain.begin(), monolingualTrain.end(),
 				[](const std::vector<int> &a, const std::vector<int> &b){ return a.size() < b.size(); });
 		if (max_train > 0) {
+			std::cout << "Training on the " << max_train << " shortest sentences...\n";
 			monolingualTrain = std::vector<std::vector<int>>(monolingualTrain.begin(),
 															 monolingualTrain.begin() + max_train);
 		}
