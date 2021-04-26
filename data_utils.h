@@ -208,10 +208,6 @@ public:
 		if (myfile.is_open()) {
 			while (getline(myfile,sourceString)) {
 				getline(myfile,targetString);
-				sourceString.erase(
-						std::remove(sourceString.begin(), sourceString.end(), '#'), sourceString.end());
-				targetString.erase(
-						std::remove(targetString.begin(), targetString.end(), '#'), targetString.end());
 				if (sourceString.size() <= max_len) {
 					out->readsourceString(sourceString);
 					out->readtargetString(targetString);

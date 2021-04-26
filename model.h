@@ -40,7 +40,8 @@ public:
 	std::vector<bool> sourceDelMask;
 
 	Base(int md, int trg_a, int src_a, bool ne = false, float fa = -1) :
-		emStd(md, trg_a, src_a, VecWeight::One(), fa), evalFst(trg_a), sourceDelMask(src_a, true) {
+		emStd(md, trg_a, src_a, VecWeight::One(), fa), evalFst(trg_a) {
+        //, sourceDelMask(src_a, true) {
 
 		targetAlphSize = trg_a;
 		sourceAlphSize = src_a;
@@ -117,14 +118,14 @@ public:
 						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
 			}
 
-			int l = sourceIndices.size();
-			for (int pos = l - 1; pos >= 0 ; pos--) {
-				if (!sourceDelMask[sourceIndices[pos]]) sourceIndices.erase(sourceIndices.begin() + pos);
-			}
-			if (sourceIndices.size() < l && verbose) {
-				std::cout << "Filtered:   " <<
-						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
-			}
+//			int l = sourceIndices.size();
+//			for (int pos = l - 1; pos >= 0 ; pos--) {
+//				if (!sourceDelMask[sourceIndices[pos]]) sourceIndices.erase(sourceIndices.begin() + pos);
+//			}
+//			if (sourceIndices.size() < l && verbose) {
+//				std::cout << "Filtered:   " <<
+//						testData.sourceIndexerPtr->encode(sourceIndices) << std::endl;
+//			}
 
 			std::vector<int> predicted = decode(sourceIndices, composeType, verbose);
 			if (predicted.size() == 0) failCount++;
@@ -553,7 +554,7 @@ public:
 		source_epsilon = em.sourceAlphSize + 1;
 		target_epsilon = em.targetAlphSize + 1;
 
-		sourceDelMask = em.getOIndices();
+//		sourceDelMask = em.getOIndices();
 
 		this->lmStd = lmFst;
 		this->emStd = em.fst;
