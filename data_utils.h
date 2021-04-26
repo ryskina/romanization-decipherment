@@ -238,12 +238,15 @@ public:
 
 		if (myfile.is_open()) {
 			while (getline(myfile,line)) {
+				int delim_idx = line.find_first_of(' ');
 				line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
-				std::vector<int> lIndices = srcIPtr->index(line.substr(0, 1));
-				assert(lIndices.size() == 1);
-				std::vector<int> oIndices = trgIPtr->index(line.substr(1));
-				for (int &oIndex : oIndices) {
-					res.push_back({oIndex, lIndices[0]});
+				std::vector<int> srcIndices = srcIPtr->index(line.substr(0, delim_idx));
+				assert(srcIndices.size() == 1);
+				std::vector<int> trgIndices = trgIPtr->index(line.substr(delim_idx));
+				if (srcIndices[0] == 0) continue;
+				for (int &trgIndex : trgIndices) {
+					if (trgIndex == 0) continue;
+					res.push_back({trgIndex, srcIndices[0]});
 				}
 			}
 			myfile.close();
