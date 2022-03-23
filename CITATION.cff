@@ -20,10 +20,14 @@ preferred-citation:
     given-names: "Matthew R."
   - family-names: "Berg-Kirkpatrick"
     given-names: "Taylor"
-  booktitle: "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics"
+  collection-title: "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics"
+  collection-type: proceedings
+  conference:
+      name: "58th Annual Meeting of the Association for Computational Linguistics"
   month: 7
   year: 2020
-  publisher: "Association for Computational Linguistics"
+  publisher: 
+    name: "Association for Computational Linguistics"
   url: "https://aclanthology.org/2020.acl-main.737"
   doi: "10.18653/v1/2020.acl-main.737"
   start: 8308 # First page number
