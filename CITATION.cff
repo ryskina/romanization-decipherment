@@ -22,8 +22,6 @@ preferred-citation:
     given-names: "Taylor"
   collection-title: "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics"
   collection-type: proceedings
-  conference:
-      name: "58th Annual Meeting of the Association for Computational Linguistics"
   month: 7
   year: 2020
   publisher: 
