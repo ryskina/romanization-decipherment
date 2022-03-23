@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite them as below."
+authors:
+- family-names: "Ryskina"
+  given-names: "Maria"
+- family-names: "Gormley"
+  given-names: "Matthew R."
+- family-names: "Berg-Kirkpatrick"
+  given-names: "Taylor"
+title: "Phonetic and Visual Priors for Decipherment of Informal Romanization (implementation)"
+version: 1.0.0
+date-released: 2020-05-14
+url: "https://github.com/ryskina/romanization-decipherment"
+preferred-citation:
+  type: conference-paper
+  authors:
+  - family-names: "Ryskina"
+    given-names: "Maria"
+  - family-names: "Gormley"
+    given-names: "Matthew R."
+  - family-names: "Berg-Kirkpatrick"
+    given-names: "Taylor"
+  booktitle: "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics"
+  month: 7
+  year: 2020
+  publisher: "Association for Computational Linguistics"
+  url: "https://aclanthology.org/2020.acl-main.737"
+  doi: "10.18653/v1/2020.acl-main.737"
+  start: 8308 # First page number
+  end: 8319 # Last page number
+  title: "Phonetic and Visual Priors for Decipherment of Informal Romanization"
