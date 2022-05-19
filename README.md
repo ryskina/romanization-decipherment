@@ -13,8 +13,8 @@ This implementation relies on the [OpenFst library](http://www.openfst.org/) and
 ## Requirements
 
   * g++ >= 5.4.0
-  * OpenFst >= 1.7.4
-  * OpenGrm >= 1.3.8
+  * OpenFst == 1.7.4
+  * OpenGrm == 1.3.8
   
 ## Data
 
