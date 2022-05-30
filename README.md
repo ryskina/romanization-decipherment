@@ -13,9 +13,11 @@ This implementation relies on the [OpenFst library](http://www.openfst.org/) and
 ## Requirements
 
   * g++ >= 5.4.0
-  * OpenFst == 1.7.4
-  * OpenGrm == 1.3.8
-  
+  * OpenFst == 1.7.X (originally implemented with 1.7.4)
+  * OpenGrm == 1.3.X (originally implemented with 1.3.8)
+
+You can install the dependencies automatically by building a Conda enviroment from [`environment.yml`](environment.yml), contributed by Michele Corrazza ([@ashmikuz](https://gitlab.com/ashmikuz)).
+
 ## Data
 
 The data files for Russian and Arabic must be stored in the `./data/ru/` and `./data/ar/` directories respectively.
